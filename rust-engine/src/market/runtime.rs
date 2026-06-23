@@ -7,8 +7,7 @@ use crate::core::task::TaskGroup;
 use crate::market::config::{MarketConfig, IB_GATEWAY_HOST};
 use crate::market::MarketPhase;
 use crate::market::{
-    ConnectionManager, HealthService, IbGatewayClient, OrderBookStore, RecorderService,
-    SubscriptionManager,
+    ConnectionManager, IbGatewayClient, OrderBookStore, RecorderService, SubscriptionManager,
 };
 
 /// market 域 shutdown 句柄（worker 由顶层 [`TaskGroup`] 统一 join）。
@@ -91,12 +90,6 @@ pub fn register(
                 .run(phase_rx, shutdown_rx)
                 .await
         }
-    });
-
-    tasks.spawn_named("market-health", {
-        let shutdown_rx = shutdown_tx.subscribe();
-        let phase_rx = phase_tx.subscribe();
-        async move { HealthService::run(shutdown_rx, phase_rx).await }
     });
 
     Ok(MarketHandles { phase_tx })

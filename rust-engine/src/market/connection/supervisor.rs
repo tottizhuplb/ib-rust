@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::{broadcast, mpsc, watch, Mutex};
-use tokio::time;
-use tracing::warn;
+use tokio::time::{self, MissedTickBehavior};
+use tracing::{info, warn};
 
 use super::{client::IbGatewayClient, session::IbSession};
 use crate::core::model::{now_ns, ApiErrorEvent, ConnectionEvent, MarketEvent};
@@ -20,6 +20,12 @@ impl ConnectionManager {
         phase_tx: watch::Sender<MarketPhase>,
         initial_backoff_secs: u64,
     ) -> anyhow::Result<()> {
+        spawn_status_logger(
+            Arc::clone(&client),
+            phase_tx.subscribe(),
+            shutdown_rx.resubscribe(),
+        );
+
         let mut backoff_secs = initial_backoff_secs.max(1);
 
         loop {
@@ -89,4 +95,25 @@ impl ConnectionManager {
             }
         }
     }
+}
+
+fn spawn_status_logger(
+    client: Arc<Mutex<IbGatewayClient>>,
+    phase_rx: watch::Receiver<MarketPhase>,
+    mut shutdown_rx: broadcast::Receiver<()>,
+) {
+    tokio::spawn(async move {
+        let mut ticker = time::interval(Duration::from_secs(10));
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                _ = ticker.tick() => {
+                    let phase = phase_rx.borrow().clone();
+                    let ib_connected = client.lock().await.is_connected();
+                    info!(phase = ?phase, ib_connected, "connection status");
+                }
+                _ = shutdown_rx.recv() => break,
+            }
+        }
+    });
 }

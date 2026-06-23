@@ -1,4 +1,4 @@
-//! 行情域：IB 连接、订阅、状态、落盘、快照、健康检查。
+//! 行情域：IB 连接、订阅、状态、落盘、快照。
 //!
 //! 数据流（当前阶段）：
 //! ```text
@@ -11,7 +11,6 @@
 
 pub mod config;
 pub mod connection;
-pub mod health;
 pub mod phase;
 pub mod recorder;
 pub mod runtime;
@@ -19,7 +18,6 @@ pub mod state;
 pub mod subscription;
 
 pub use connection::{ConnectionManager, IbGatewayClient};
-pub use health::HealthService;
 pub use phase::MarketPhase;
 pub use recorder::{MarketWalReader, MarketWalRecord, MarketWalWriter, RecorderService};
 pub use runtime::{register, MarketHandles};
