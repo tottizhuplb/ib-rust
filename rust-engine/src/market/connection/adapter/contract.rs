@@ -1,6 +1,6 @@
 use ibapi::contracts::{Contract, SecurityType};
 
-use crate::core::domain::{SecType, Symbol};
+use crate::core::model::{SecType, Symbol};
 
 pub fn equity_contract(symbol: &Symbol) -> Contract {
     Contract {

@@ -6,7 +6,7 @@ use tokio::time;
 use tracing::warn;
 
 use super::{client::IbGatewayClient, session::IbSession};
-use crate::core::domain::{now_ns, ApiErrorEvent, ConnectionEvent, MarketEvent};
+use crate::core::model::{now_ns, ApiErrorEvent, ConnectionEvent, MarketEvent};
 use crate::core::pipeline::EventPublisher;
 use crate::core::RunState;
 

@@ -73,7 +73,8 @@ services:
     restart: unless-stopped
     command: ["./engine"]
     volumes:
-      - ./data:/app/data        # 行情落盘（config.yaml storage.data_dir）
+      - ./data:/app/data        # 行情落盘（conf/config.yaml storage.data_dir）
+      - ./logs:/app/logs        # 应用日志（conf/config.yaml logging.log_dir）
 
   # ---------------------------------------------------------------------------
   # Rust 开发容器：挂载源码，进入容器内手动 cargo build / run / test
@@ -92,6 +93,7 @@ services:
     volumes:
       - ./rust-engine:/app
       - ./data:/app/data        # 与 prod 共用宿主机 data/（覆盖 /app 下的 data 子目录）
+      - ./logs:/app/logs        # 与 prod 共用宿主机 logs/
       - rust-engine-cargo-registry:/usr/local/cargo/registry
       - rust-engine-cargo-git:/usr/local/cargo/git
       - rust-engine-target:/app/target

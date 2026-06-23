@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use crate::core::domain::DesiredSubscription;
+use crate::market::subscription::DesiredSubscription;
 
 #[derive(Debug, Clone)]
-pub struct Config {
+pub struct MarketConfig {
     pub ib: IbConfig,
     pub storage: StorageConfig,
     pub pipeline: PipelineConfig,
@@ -33,7 +33,7 @@ pub struct PipelineConfig {
     pub reconnect_backoff_secs: u64,
 }
 
-impl Config {
+impl MarketConfig {
     pub fn from_env() -> Self {
         use std::env;
 

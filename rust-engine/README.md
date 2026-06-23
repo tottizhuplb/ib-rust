@@ -18,9 +18,13 @@
 ```
 src/
 ├── main.rs / app.rs     # 装配与 run_forever()
-├── config/              # config.yaml + 环境变量覆盖
-├── core/                # 共享事件契约（domain / pipeline / RunState）
-├── market/              # 当前唯一实现域
+├── core/
+│   ├── config/          # conf/ yaml 加载
+│   ├── model/           # 跨域共享类型（MarketEvent、Symbol…）
+│   └── pipeline/
+├── market/
+│   ├── config/          # IB / 存储 / 管道配置模型
+│   └── subscription/    # 订阅业务模型
 ├── strategy/            # 预留
 ├── risk/                # 预留
 └── order/               # 预留
@@ -29,19 +33,22 @@ src/
 ## 启动
 
 ```bash
-# 编辑 config.yaml 后
+# 编辑 conf/config.yaml 后
 cargo run
 
 # 或开发热重载
 cargo watch -x run
+
+# 格式化（编辑器保存时会自动 fmt；提交前或批量改代码后可手动跑）
+cargo fmt --all
 ```
 
-配置：`config.yaml`（主配置）+ 环境变量覆盖（如 `TRADING_MODE`、`IB_HOST=ib-gateway`）。
+配置：`conf/config.yaml`（主配置）+ `conf/<domain>/` 业务配置 + 环境变量覆盖（如 `TRADING_MODE`、`IB_HOST=ib-gateway`）。
 
 ## 依赖方向
 
 ```
-app → market / config
+app → core / market
 market/* → core
-config → core::domain
+core/config → market/config（组装 MarketConfig）
 ```

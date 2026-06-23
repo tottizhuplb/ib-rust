@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-use crate::core::domain::Symbol;
+use crate::core::model::Symbol;
 
 #[derive(Default)]
 pub struct SymbolRegistry {

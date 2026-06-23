@@ -1,7 +1,7 @@
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
-use crate::core::domain::MarketEvent;
+use crate::core::model::MarketEvent;
 use crate::core::pipeline::EventRecorder;
 use crate::market::recorder::JsonlZstdRecorder;
 

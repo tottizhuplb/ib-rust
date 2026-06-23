@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::symbol::{SecType, Symbol};
+use crate::core::model::{SecType, Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -60,7 +60,7 @@ impl ActiveSubscription {
     }
 }
 
-/// yaml 中 `subscriptions:` 下的一行。
+/// conf/market/subscriptions.yaml 中的一行。
 #[derive(Debug, Deserialize)]
 pub struct SubscriptionEntry {
     pub symbol: String,

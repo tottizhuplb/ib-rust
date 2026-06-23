@@ -1,0 +1,34 @@
+# rust-engine 入口配置（启动时加载）
+# 环境变量可覆盖 ib / storage / pipeline / logging 字段
+#
+# CONFIG_PATH=conf/config.yaml cargo run
+#
+# 目录约定（均在 conf/ 下）：
+#   config.yaml          基础设施 + 外部文件路径（本文件）
+#   <domain>/            各域业务配置（路径在 paths 段声明）
+#     market/            行情采集
+#     strategy/          （预留）
+#     risk/              （预留）
+
+ib:
+  host: ib-gateway
+  client_id: 101
+
+storage:
+  data_dir: ./data
+  segment_max_bytes: 268435456
+
+pipeline:
+  event_channel_capacity: 50000
+  snapshot_channel_capacity: 1000
+  flush_interval_ms: 500
+  snapshot_interval_secs: 30
+  reconnect_backoff_secs: 1
+
+logging:
+  log_dir: ./logs
+  level: info
+  rotation: daily   # daily | hourly
+
+paths:
+  subscriptions: market/subscriptions.yaml

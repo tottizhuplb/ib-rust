@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::decoder::SymbolRegistry;
-use crate::core::domain::{
+use crate::core::model::{
     now_ns, ApiErrorEvent, ConnectionEvent, ControlEvent, DepthEvent, MarketEvent, TopOfBookEvent,
 };
 use crate::core::pipeline::EventPublisher;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use super::bus::{EventPublisher, PublishError};
-use crate::core::domain::MarketEvent;
+use crate::core::model::MarketEvent;
 
 #[derive(Clone)]
 pub struct MpscPublisher {

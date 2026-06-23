@@ -1,0 +1,14 @@
+# market 域 — 订阅标的（session ready 后由 Subscription Manager reconcile）
+
+- symbol: "00700"
+  exchange: SEHK
+  currency: HKD
+  sec_type: STK
+  mode: depth
+  levels: 10
+
+- symbol: "09988"
+  exchange: SEHK
+  currency: HKD
+  sec_type: STK
+  mode: top

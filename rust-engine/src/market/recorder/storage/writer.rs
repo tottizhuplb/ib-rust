@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use zstd::stream::write::Encoder;
 
 use super::{layout, segment, wal};
-use crate::config::StorageConfig;
-use crate::core::domain::MarketEvent;
+use crate::market::config::StorageConfig;
+use crate::core::model::MarketEvent;
 use crate::core::pipeline::EventRecorder;
 
 /// 单写者 JSONL 记录器，每段文件 zstd 压缩。

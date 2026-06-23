@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::config::StorageConfig;
+use crate::market::config::StorageConfig;
 
 pub fn ensure_data_dir(config: &StorageConfig) -> anyhow::Result<PathBuf> {
     std::fs::create_dir_all(&config.data_dir)?;

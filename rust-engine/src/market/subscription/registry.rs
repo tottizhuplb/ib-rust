@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::domain::{
+use crate::market::subscription::{
     ActiveSubscription, DesiredSubscription, SubscriptionKey, SubscriptionStatus,
 };
 

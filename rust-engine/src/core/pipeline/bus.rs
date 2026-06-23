@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::core::domain::MarketEvent;
+use crate::core::model::MarketEvent;
 
 #[derive(Debug, Clone)]
 pub enum PublishError {
@@ -36,13 +36,13 @@ pub trait MarketDataSource: Send {
 pub trait SubscriptionControl: Send + Sync {
     async fn subscribe_top(
         &self,
-        symbol: crate::core::domain::Symbol,
+        symbol: crate::core::model::Symbol,
     ) -> anyhow::Result<SubscriptionId>;
     async fn unsubscribe_top(&self, id: SubscriptionId) -> anyhow::Result<()>;
 
     async fn subscribe_depth(
         &self,
-        symbol: crate::core::domain::Symbol,
+        symbol: crate::core::model::Symbol,
         levels: usize,
     ) -> anyhow::Result<SubscriptionId>;
 
@@ -60,12 +60,12 @@ pub trait EventRecorder: Send {
 pub trait SnapshotStore: Send + Sync {
     async fn save_book(
         &self,
-        symbol: &crate::core::domain::Symbol,
-        snapshot: &crate::core::domain::OrderBookSnapshot,
+        symbol: &crate::core::model::Symbol,
+        snapshot: &crate::core::model::OrderBookSnapshot,
     ) -> anyhow::Result<()>;
 
     async fn load_book(
         &self,
-        symbol: &crate::core::domain::Symbol,
-    ) -> anyhow::Result<Option<crate::core::domain::OrderBookSnapshot>>;
+        symbol: &crate::core::model::Symbol,
+    ) -> anyhow::Result<Option<crate::core::model::OrderBookSnapshot>>;
 }

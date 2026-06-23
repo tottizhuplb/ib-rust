@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::time::{self, Duration};
 
-use crate::config::StorageConfig;
+use crate::market::config::StorageConfig;
 use crate::market::recorder::JsonlZstdRecorder;
 use crate::market::state::OrderBookStore;
 

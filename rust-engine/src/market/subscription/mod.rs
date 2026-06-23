@@ -4,6 +4,11 @@
 //! - [`SubscriptionManager`]
 
 mod manager;
+mod model;
 mod registry;
 
 pub use manager::SubscriptionManager;
+pub use model::{
+    ActiveSubscription, DesiredSubscription, SubscriptionEntry, SubscriptionKey, SubscriptionKind,
+    SubscriptionStatus,
+};

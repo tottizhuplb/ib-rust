@@ -14,6 +14,7 @@
 //! - [`snapshot::SnapshotService`]
 //! - [`health::HealthService`]
 
+pub mod config;
 pub mod connection;
 pub mod health;
 pub mod recorder;

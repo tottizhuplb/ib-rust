@@ -3,9 +3,9 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, watch, Mutex};
 use tracing::{error, info, warn};
 
-use crate::config::Config;
-use crate::core::domain::OrderBookSnapshot;
+use crate::core::model::OrderBookSnapshot;
 use crate::core::pipeline::EventPublisher;
+use crate::core::Config;
 use crate::core::RunState;
 use crate::market::{
     ConnectionManager, HealthService, IbGatewayClient, JsonlZstdRecorder, OrderBookStore,
@@ -23,19 +23,19 @@ impl App {
 
     pub async fn run_forever(self) -> anyhow::Result<()> {
         info!(
-            host = %self.config.ib.host,
-            port = self.config.ib.port,
-            client_id = self.config.ib.client_id,
-            data_dir = %self.config.storage.data_dir.display(),
-            desired_subscriptions = self.config.subscriptions.len(),
+            host = %self.config.market.ib.host,
+            port = self.config.market.ib.port,
+            client_id = self.config.market.ib.client_id,
+            data_dir = %self.config.market.storage.data_dir.display(),
+            desired_subscriptions = self.config.market.subscriptions.len(),
             "starting rust-engine (market phase)"
         );
 
         let (event_tx, event_rx) = crate::core::pipeline::backpressure::event_channel(
-            self.config.pipeline.event_channel_capacity,
+            self.config.market.pipeline.event_channel_capacity,
         );
         let (snapshot_tx, snapshot_rx) =
-            mpsc::channel::<OrderBookSnapshot>(self.config.pipeline.snapshot_channel_capacity);
+            mpsc::channel::<OrderBookSnapshot>(self.config.market.pipeline.snapshot_channel_capacity);
         let (shutdown_tx, _) = broadcast::channel::<()>(16);
         let (state_tx, _state_rx) = watch::channel(RunState::Starting);
 
@@ -43,12 +43,12 @@ impl App {
             crate::core::pipeline::MpscPublisher::new(event_tx.clone());
 
         let ib_client = Arc::new(Mutex::new(IbGatewayClient::new(
-            self.config.ib.clone(),
+            self.config.market.ib.clone(),
             Arc::clone(&publisher),
         )));
 
         let books = Arc::new(OrderBookStore::new());
-        let recorder = JsonlZstdRecorder::new(self.config.storage.clone())?;
+        let recorder = JsonlZstdRecorder::new(self.config.market.storage.clone())?;
 
         let _snapshot_tx = snapshot_tx;
         let _snapshot_rx = snapshot_rx;
@@ -57,7 +57,7 @@ impl App {
 
         tasks.spawn({
             let shutdown_rx = shutdown_tx.subscribe();
-            let flush_interval_ms = self.config.pipeline.flush_interval_ms;
+            let flush_interval_ms = self.config.market.pipeline.flush_interval_ms;
             async move {
                 RecorderService::run(event_rx, recorder, shutdown_rx, flush_interval_ms).await
             }
@@ -65,9 +65,9 @@ impl App {
 
         tasks.spawn({
             let books = Arc::clone(&books);
-            let storage = self.config.storage.clone();
+            let storage = self.config.market.storage.clone();
             let shutdown_rx = shutdown_tx.subscribe();
-            let interval_secs = self.config.pipeline.snapshot_interval_secs;
+            let interval_secs = self.config.market.pipeline.snapshot_interval_secs;
             async move { SnapshotService::run(books, storage, shutdown_rx, interval_secs).await }
         });
 
@@ -76,7 +76,7 @@ impl App {
             let publisher = Arc::clone(&publisher);
             let shutdown_rx = shutdown_tx.subscribe();
             let state_tx = state_tx.clone();
-            let initial_backoff = self.config.pipeline.reconnect_backoff_secs;
+            let initial_backoff = self.config.market.pipeline.reconnect_backoff_secs;
             async move {
                 ConnectionManager::run_supervisor(
                     client,
@@ -90,7 +90,7 @@ impl App {
         });
 
         tasks.spawn({
-            let desired = self.config.subscriptions.clone();
+            let desired = self.config.market.subscriptions.clone();
             let client = Arc::clone(&ib_client);
             let shutdown_rx = shutdown_tx.subscribe();
             let sub_state_rx = state_tx.subscribe();

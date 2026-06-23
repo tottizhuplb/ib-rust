@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use crate::core::domain::MarketEvent;
+use crate::core::model::MarketEvent;
 
 /// 有界 channel 指标钩子；接入 Prometheus 时可在此扩展。
 pub struct BackpressureMonitor {

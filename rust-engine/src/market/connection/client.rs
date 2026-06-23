@@ -6,8 +6,8 @@ use ibapi::prelude::*;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use crate::config::IbConfig;
-use crate::core::domain::{now_ns, ConnectionEvent, MarketEvent};
+use crate::market::config::IbConfig;
+use crate::core::model::{now_ns, ConnectionEvent, MarketEvent};
 use crate::core::pipeline::{
     EventPublisher, MarketDataSource, SubscriptionControl, SubscriptionId,
 };
@@ -77,7 +77,7 @@ impl MarketDataSource for IbGatewayClient {
             info!(?accounts, "managed accounts");
             let _ =
                 self.publisher
-                    .publish(MarketEvent::Control(crate::core::domain::ControlEvent {
+                    .publish(MarketEvent::Control(crate::core::model::ControlEvent {
                         ts_ns: now_ns(),
                         message: format!("managed accounts: {accounts:?}"),
                     }));
@@ -106,7 +106,7 @@ impl MarketDataSource for IbGatewayClient {
 impl SubscriptionControl for IbGatewayClient {
     async fn subscribe_top(
         &self,
-        symbol: crate::core::domain::Symbol,
+        symbol: crate::core::model::Symbol,
     ) -> anyhow::Result<SubscriptionId> {
         let _client = self.client.as_ref().context("IB client not connected")?;
         let _contract = super::adapter::equity_contract(&symbol);
@@ -123,7 +123,7 @@ impl SubscriptionControl for IbGatewayClient {
 
     async fn subscribe_depth(
         &self,
-        symbol: crate::core::domain::Symbol,
+        symbol: crate::core::model::Symbol,
         levels: usize,
     ) -> anyhow::Result<SubscriptionId> {
         let _client = self.client.as_ref().context("IB client not connected")?;
