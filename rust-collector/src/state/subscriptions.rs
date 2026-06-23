@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::domain::{
-    ActiveSubscription, DesiredSubscription, SubscriptionKey, SubscriptionStatus,
-};
+use crate::domain::{ActiveSubscription, DesiredSubscription, SubscriptionKey, SubscriptionStatus};
 
 /// Holds desired vs active subscription sets and req_id mappings.
 #[derive(Debug, Default)]
@@ -15,10 +13,7 @@ pub struct SubscriptionRegistry {
 
 impl SubscriptionRegistry {
     pub fn new(desired: Vec<DesiredSubscription>) -> Self {
-        let desired = desired
-            .into_iter()
-            .map(|sub| (sub.key(), sub))
-            .collect();
+        let desired = desired.into_iter().map(|sub| (sub.key(), sub)).collect();
         Self {
             desired,
             next_req_id: 1,

@@ -54,20 +54,17 @@ impl Config {
     fn from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let text = std::fs::read_to_string(path.as_ref())
             .with_context(|| format!("read config file {}", path.as_ref().display()))?;
-        let file: FileConfig =
-            serde_yaml::from_str(&text).context("parse config yaml")?;
+        let file: FileConfig = serde_yaml::from_str(&text).context("parse config yaml")?;
 
         let account_mode = AccountMode::from_env(
             &std::env::var("TRADING_MODE").unwrap_or_else(|_| "paper".into()),
         );
 
         let ib_file = file.ib.unwrap_or_default();
-        let host = ib_file
-            .host
-            .unwrap_or_else(|| "ib-gateway".into());
-        let port = ib_file.port.unwrap_or_else(|| {
-            super::resolve_port(&host, account_mode, None)
-        });
+        let host = ib_file.host.unwrap_or_else(|| "ib-gateway".into());
+        let port = ib_file
+            .port
+            .unwrap_or_else(|| super::resolve_port(&host, account_mode, None));
 
         let subscriptions: Vec<DesiredSubscription> = file
             .subscriptions
@@ -90,17 +87,11 @@ impl Config {
                 data_dir: storage_file
                     .data_dir
                     .unwrap_or_else(|| PathBuf::from("./data")),
-                segment_max_bytes: storage_file
-                    .segment_max_bytes
-                    .unwrap_or(256 * 1024 * 1024),
+                segment_max_bytes: storage_file.segment_max_bytes.unwrap_or(256 * 1024 * 1024),
             },
             pipeline: PipelineConfig {
-                event_channel_capacity: pipeline_file
-                    .event_channel_capacity
-                    .unwrap_or(50_000),
-                snapshot_channel_capacity: pipeline_file
-                    .snapshot_channel_capacity
-                    .unwrap_or(1_000),
+                event_channel_capacity: pipeline_file.event_channel_capacity.unwrap_or(50_000),
+                snapshot_channel_capacity: pipeline_file.snapshot_channel_capacity.unwrap_or(1_000),
                 flush_interval_ms: pipeline_file.flush_interval_ms.unwrap_or(500),
                 snapshot_interval_secs: pipeline_file.snapshot_interval_secs.unwrap_or(30),
                 reconnect_backoff_secs: pipeline_file.reconnect_backoff_secs.unwrap_or(1),
@@ -136,8 +127,7 @@ impl Config {
             self.pipeline.event_channel_capacity = env_config.pipeline.event_channel_capacity;
         }
         if std::env::var("SNAPSHOT_CHANNEL_CAPACITY").is_ok() {
-            self.pipeline.snapshot_channel_capacity =
-                env_config.pipeline.snapshot_channel_capacity;
+            self.pipeline.snapshot_channel_capacity = env_config.pipeline.snapshot_channel_capacity;
         }
         if std::env::var("FLUSH_INTERVAL_MS").is_ok() {
             self.pipeline.flush_interval_ms = env_config.pipeline.flush_interval_ms;

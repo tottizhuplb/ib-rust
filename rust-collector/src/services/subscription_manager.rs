@@ -54,12 +54,8 @@ impl SubscriptionManager {
     }
 
     pub async fn reconcile(&mut self) -> anyhow::Result<()> {
-        let to_add: Vec<DesiredSubscription> = self
-            .registry
-            .keys_to_add()
-            .into_iter()
-            .cloned()
-            .collect();
+        let to_add: Vec<DesiredSubscription> =
+            self.registry.keys_to_add().into_iter().cloned().collect();
 
         for desired in to_add {
             let req_id = self.registry.mark_pending(&desired);
@@ -80,9 +76,7 @@ impl SubscriptionManager {
                 SubscriptionKind::Depth => {
                     let levels = desired.levels.unwrap_or(10);
                     let client = self.client.lock().await;
-                    client
-                        .subscribe_depth(desired.symbol.clone(), levels)
-                        .await
+                    client.subscribe_depth(desired.symbol.clone(), levels).await
                 }
             };
 

@@ -127,7 +127,11 @@ impl AccountMode {
     }
 }
 
-pub(crate) fn resolve_port(host: &str, account_mode: AccountMode, explicit_port: Option<u16>) -> u16 {
+pub(crate) fn resolve_port(
+    host: &str,
+    account_mode: AccountMode,
+    explicit_port: Option<u16>,
+) -> u16 {
     if let Some(port) = explicit_port {
         return port;
     }

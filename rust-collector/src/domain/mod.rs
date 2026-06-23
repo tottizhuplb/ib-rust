@@ -11,8 +11,8 @@ pub use depth::{BookLevel, BookSide, DepthEvent, DepthOperation, OrderBookSnapsh
 pub use error::ApiErrorEvent;
 pub use event::{now_ns, MarketEvent};
 pub use subscription::{
-    ActiveSubscription, DesiredSubscription, SubscriptionEntry, SubscriptionKey,
-    SubscriptionKind, SubscriptionStatus,
+    ActiveSubscription, DesiredSubscription, SubscriptionEntry, SubscriptionKey, SubscriptionKind,
+    SubscriptionStatus,
 };
 pub use symbol::{SecType, Symbol};
 pub use top::TopOfBookEvent;
