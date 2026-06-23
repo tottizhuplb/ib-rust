@@ -8,15 +8,15 @@
 #   生产模式：    docker compose --profile prod up -d --build
 #
 # 说明：不带 profile 的 `docker compose up` 只会启动 ib-gateway，
-#       collector 需通过 dev / prod profile 显式选择。
+#       engine 需通过 dev / prod profile 显式选择。
 # =============================================================================
 
-# rust-collector 公共配置（prod / dev 共用，通过 YAML anchor 继承）
+# rust-engine 公共配置（prod / dev 共用，通过 YAML anchor 继承）
 # 配置与 ib-gateway 共用 .env（见 .env.example）
-x-rust-collector-base: &rust-collector-base
+x-rust-engine-base: &rust-engine-base
   depends_on:
     ib-gateway:
-      condition: service_healthy # 等 Gateway API 端口就绪后再启动 collector
+      condition: service_healthy # 等 Gateway API 端口就绪后再启动 engine
   env_file:
     - .env
   working_dir: /app
@@ -31,7 +31,7 @@ services:
   #
   # 端口说明（socat 转发）：
   #   宿主机 4001/4002 ↔ 容器 4003/4004 ↔ 内部 TWS 127.0.0.1:4001/4002
-  #   容器网络内 collector 连 ib-gateway:4004（paper）或 :4003（live）
+  #   容器网络内 engine 连 ib-gateway:4004（paper）或 :4003（live）
   # ---------------------------------------------------------------------------
   ib-gateway:
     image: ghcr.io/gnzsnz/ib-gateway:stable
@@ -61,17 +61,17 @@ services:
       - ib-net
 
   # ---------------------------------------------------------------------------
-  # 生产 collector：release 二进制打入镜像，不挂载源码
+  # 生产 engine：release 二进制打入镜像，不挂载源码
   # ---------------------------------------------------------------------------
-  rust-collector:
-    <<: *rust-collector-base
+  rust-engine:
+    <<: *rust-engine-base
     profiles: ["prod"]
     build:
-      context: ./rust-collector
-      dockerfile: Dockerfile   # 多阶段构建 → debian-slim + ./collector
-    container_name: rust-collector
+      context: ./rust-engine
+      dockerfile: Dockerfile   # 多阶段构建 → debian-slim + ./engine
+    container_name: rust-engine
     restart: unless-stopped
-    command: ["./collector"]
+    command: ["./engine"]
 
   # ---------------------------------------------------------------------------
   # Rust 开发容器：挂载源码，进入容器内手动 cargo build / run / test
@@ -79,27 +79,27 @@ services:
   #   docker exec -it rust-dev bash
   # ---------------------------------------------------------------------------
   rust-dev:
-    <<: *rust-collector-base
+    <<: *rust-engine-base
     profiles: ["dev"]
     build:
-      context: ./rust-collector
+      context: ./rust-engine
       dockerfile: Dockerfile.dev
     container_name: rust-dev
     stdin_open: true
     tty: true
     volumes:
-      - ./rust-collector:/app
-      - rust-collector-cargo-registry:/usr/local/cargo/registry
-      - rust-collector-cargo-git:/usr/local/cargo/git
-      - rust-collector-target:/app/target
+      - ./rust-engine:/app
+      - rust-engine-cargo-registry:/usr/local/cargo/registry
+      - rust-engine-cargo-git:/usr/local/cargo/git
+      - rust-engine-target:/app/target
 
-# 容器间通信网络（ib-gateway ↔ rust-collector）
+# 容器间通信网络（ib-gateway ↔ rust-engine）
 networks:
   ib-net:
     driver: bridge
 
 # dev 模式编译缓存卷（显式声明；删除此块 Compose 也会自动创建同名 volume）
 volumes:
-  rust-collector-cargo-registry:
-  rust-collector-cargo-git:
-  rust-collector-target:
+  rust-engine-cargo-registry:
+  rust-engine-cargo-git:
+  rust-engine-target:
