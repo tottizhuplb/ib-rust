@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use super::decoder::SymbolRegistry;
 use crate::core::model::{
-    now_ns, ApiErrorEvent, ConnectionEvent, ControlEvent, DepthEvent, MarketEvent, TopOfBookEvent,
+    now_ns, ApiErrorEvent, ConnectionEvent, ControlEvent, MarketEvent, MktDataEvent, MktDepthEvent,
 };
 use super::super::publish::try_publish;
 
@@ -32,12 +32,12 @@ impl IbEventBridge {
         );
     }
 
-    pub fn publish_top(&self, events: &mpsc::Sender<MarketEvent>, event: TopOfBookEvent) {
-        let _ = try_publish(events, MarketEvent::TopOfBook(event));
+    pub fn publish_mkt_data(&self, events: &mpsc::Sender<MarketEvent>, event: MktDataEvent) {
+        let _ = try_publish(events, MarketEvent::MktData(event));
     }
 
-    pub fn publish_depth(&self, events: &mpsc::Sender<MarketEvent>, event: DepthEvent) {
-        let _ = try_publish(events, MarketEvent::Depth(event));
+    pub fn publish_mkt_depth(&self, events: &mpsc::Sender<MarketEvent>, event: MktDepthEvent) {
+        let _ = try_publish(events, MarketEvent::MktDepth(event));
     }
 
     pub fn publish_api_error(

@@ -1,7 +1,23 @@
 use anyhow::bail;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::core::model::{SecType, Symbol, TickByTickType};
+use crate::core::model::{SecType, Symbol};
+
+/// IB `reqTickByTickData` 的 tickType 请求参数（配置侧，非 response）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum TickByTickType {
+    Last,
+    AllLast,
+    BidAsk,
+    MidPoint,
+}
+
+impl Default for TickByTickType {
+    fn default() -> Self {
+        Self::Last
+    }
+}
 
 /// IB 行情 API，与订阅计费项一一对应。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

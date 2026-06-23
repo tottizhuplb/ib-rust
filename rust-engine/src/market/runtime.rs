@@ -6,9 +6,7 @@ use tracing::info;
 use crate::core::task::TaskGroup;
 use crate::market::config::{MarketConfig, IB_GATEWAY_HOST};
 use crate::market::MarketPhase;
-use crate::market::{
-    ConnectionManager, IbGatewayClient, OrderBookStore, RecorderService, SubscriptionManager,
-};
+use crate::market::{ConnectionManager, IbGatewayClient, RecorderService, SubscriptionManager};
 
 /// market 域 shutdown 句柄（worker 由顶层 [`TaskGroup`] 统一 join）。
 pub struct MarketHandles {
@@ -42,22 +40,16 @@ pub fn register(
 
     let ib_client = Arc::new(Mutex::new(IbGatewayClient::new(config.ib.clone())));
 
-    let books = Arc::new(OrderBookStore::new());
-
     tasks.spawn_named("market-recorder", {
-        let books = Arc::clone(&books);
         let shutdown_rx = shutdown_tx.subscribe();
         let wal_config = config.storage.wal_config();
         let flush_interval_ms = config.pipeline.flush_interval_ms;
-        let snapshot_interval_secs = config.pipeline.snapshot_interval_secs;
         async move {
             RecorderService::run(
                 event_rx,
                 wal_config,
-                books,
                 shutdown_rx,
                 flush_interval_ms,
-                snapshot_interval_secs,
             )
             .await
         }

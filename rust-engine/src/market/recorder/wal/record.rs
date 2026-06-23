@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::core::model::{MarketEvent, OrderBookSnapshot};
+use crate::core::model::{MarketEvent, MktDataEvent};
 use crate::core::wal::{WalSeq, WalSnapshotRecord};
 
 /// market 域 WAL 记录：`event` 与 `snapshot` 共用全局单调 `seq`。
@@ -16,7 +16,7 @@ pub enum MarketWalRecord {
         seq: u64,
         ts_ns: i64,
         as_of_seq: u64,
-        books: Vec<OrderBookSnapshot>,
+        quotes: Vec<MktDataEvent>,
     },
 }
 
@@ -39,12 +39,12 @@ impl MarketWalRecord {
         Self::Event { seq, ts_ns, event }
     }
 
-    pub fn snapshot(books: Vec<OrderBookSnapshot>, seq: u64, ts_ns: i64, as_of_seq: u64) -> Self {
+    pub fn snapshot(quotes: Vec<MktDataEvent>, seq: u64, ts_ns: i64, as_of_seq: u64) -> Self {
         Self::Snapshot {
             seq,
             ts_ns,
             as_of_seq,
-            books,
+            quotes,
         }
     }
 }

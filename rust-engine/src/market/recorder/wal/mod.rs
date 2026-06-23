@@ -1,4 +1,4 @@
-use crate::core::model::{now_ns, MarketEvent, OrderBookSnapshot};
+use crate::core::model::{now_ns, MarketEvent, MktDataEvent};
 use crate::core::wal::{WalConfig, WalReader, WalRecordKind, WalWriter};
 
 mod record;
@@ -31,10 +31,10 @@ impl MarketWalWriter {
         Ok(seq)
     }
 
-    pub fn append_snapshot(&mut self, books: &[OrderBookSnapshot]) -> anyhow::Result<u64> {
+    pub fn append_snapshot(&mut self, quotes: &[MktDataEvent]) -> anyhow::Result<u64> {
         let seq = self.inner.next_seq();
         let as_of_seq = self.inner.last_event_seq();
-        let record = MarketWalRecord::snapshot(books.to_vec(), seq, now_ns(), as_of_seq);
+        let record = MarketWalRecord::snapshot(quotes.to_vec(), seq, now_ns(), as_of_seq);
         let line = serde_json::to_vec(&record)?;
         self.inner.append_line(seq, &line, WalRecordKind::Snapshot)?;
         Ok(seq)

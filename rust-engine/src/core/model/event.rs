@@ -2,20 +2,23 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     connection::{ConnectionEvent, ControlEvent},
-    depth::DepthEvent,
     error::ApiErrorEvent,
-    tick_by_tick::TickByTickEvent,
-    top::TopOfBookEvent,
+    mkt_data::MktDataEvent,
+    mkt_depth::MktDepthEvent,
+    tick_by_tick_data::TickByTickDataEvent,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MarketEvent {
     Connection(ConnectionEvent),
-    TopOfBook(TopOfBookEvent),
-    TickByTick(TickByTickEvent),
-    Depth(DepthEvent),
     Control(ControlEvent),
     ApiError(ApiErrorEvent),
+    #[serde(rename = "mktData")]
+    MktData(MktDataEvent),
+    #[serde(rename = "tickByTickData")]
+    TickByTickData(TickByTickDataEvent),
+    #[serde(rename = "mktDepth")]
+    MktDepth(MktDepthEvent),
 }
 
 pub fn now_ns() -> i64 {

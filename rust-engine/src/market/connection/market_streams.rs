@@ -9,15 +9,14 @@ use tracing::warn;
 
 use tokio::sync::mpsc;
 
-use crate::core::model::{MarketEvent, Symbol, TickByTickType};
+use crate::core::model::{MarketEvent, Symbol};
 use crate::market::connection::adapter::{
-    apply_top_tick, publish_depth, publish_tick_by_tick_bid_ask, publish_tick_by_tick_midpoint,
-    publish_tick_by_tick_trade, publish_top, TopQuoteState,
+    publish_mkt_data, publish_mkt_depth, publish_tick_by_tick, tick_by_tick_bid_ask,
+    tick_by_tick_midpoint, tick_by_tick_trade,
 };
 
 struct MktDataSubscription {
     symbol: Symbol,
-    quote: TopQuoteState,
     subscription: Subscription<TickTypes>,
 }
 
@@ -27,10 +26,7 @@ struct MktDepthSubscription {
 }
 
 enum TickByTickSubscription {
-    Trade {
-        tick_type: TickByTickType,
-        subscription: Subscription<Trade>,
-    },
+    Trade(Subscription<Trade>),
     BidAsk(Subscription<BidAsk>),
     MidPoint(Subscription<MidPoint>),
 }
@@ -67,7 +63,6 @@ impl MarketDataStreams {
             req_id,
             MktDataSubscription {
                 symbol,
-                quote: TopQuoteState::default(),
                 subscription,
             },
         );
@@ -89,17 +84,13 @@ impl MarketDataStreams {
         &self,
         req_id: i32,
         symbol: Symbol,
-        tick_type: TickByTickType,
         subscription: Subscription<Trade>,
     ) {
         self.tick_by_tick.lock().await.insert(
             req_id,
             TickByTickEntry {
                 symbol,
-                stream: TickByTickSubscription::Trade {
-                    tick_type,
-                    subscription,
-                },
+                stream: TickByTickSubscription::Trade(subscription),
             },
         );
     }
@@ -158,12 +149,8 @@ impl MarketDataStreams {
                 match tokio::time::timeout(Duration::from_millis(0), sub.subscription.next()).await {
                     Ok(Some(Ok(SubscriptionItem::Data(tick)))) => {
                         any = true;
-                        if apply_top_tick(&mut sub.quote, tick) {
-                            if let Err(error) =
-                                publish_top(events, *req_id, &sub.symbol, &sub.quote)
-                            {
-                                warn!(req_id, %error, "event channel full or closed");
-                            }
+                        if let Err(error) = publish_mkt_data(events, *req_id, &sub.symbol, tick) {
+                            warn!(req_id, %error, "event channel full or closed");
                         }
                     }
                     Ok(Some(Ok(SubscriptionItem::Notice(notice)))) => {
@@ -200,7 +187,7 @@ impl MarketDataStreams {
                 {
                     Ok(Some(Ok(SubscriptionItem::Data(update)))) => {
                         any = true;
-                        if let Err(error) = publish_depth(events, update, *req_id, &sub.symbol) {
+                        if let Err(error) = publish_mkt_depth(events, update, *req_id, &sub.symbol) {
                             warn!(req_id, %error, "event channel full or closed");
                         }
                     }
@@ -235,7 +222,7 @@ impl MarketDataStreams {
         for (req_id, entry) in tick_by_tick.iter_mut() {
             loop {
                 let next = match &mut entry.stream {
-                    TickByTickSubscription::Trade { subscription, .. } => {
+                    TickByTickSubscription::Trade(subscription) => {
                         poll_trade_stream(subscription).await
                     }
                     TickByTickSubscription::BidAsk(subscription) => {
@@ -254,38 +241,33 @@ impl MarketDataStreams {
                     }
                     StreamPoll::Trade(trade) => {
                         any = true;
-                        let tick_type = match &entry.stream {
-                            TickByTickSubscription::Trade { tick_type, .. } => *tick_type,
-                            _ => unreachable!(),
-                        };
-                        if let Err(error) = publish_tick_by_tick_trade(
+                        if let Err(error) = publish_tick_by_tick(
                             events,
                             *req_id,
                             &entry.symbol,
-                            tick_type,
-                            &trade,
+                            tick_by_tick_trade(trade),
                         ) {
                             warn!(req_id, %error, "event channel full or closed");
                         }
                     }
                     StreamPoll::BidAsk(quote) => {
                         any = true;
-                        if let Err(error) = publish_tick_by_tick_bid_ask(
+                        if let Err(error) = publish_tick_by_tick(
                             events,
                             *req_id,
                             &entry.symbol,
-                            &quote,
+                            tick_by_tick_bid_ask(quote),
                         ) {
                             warn!(req_id, %error, "event channel full or closed");
                         }
                     }
                     StreamPoll::MidPoint(midpoint) => {
                         any = true;
-                        if let Err(error) = publish_tick_by_tick_midpoint(
+                        if let Err(error) = publish_tick_by_tick(
                             events,
                             *req_id,
                             &entry.symbol,
-                            &midpoint,
+                            tick_by_tick_midpoint(midpoint),
                         ) {
                             warn!(req_id, %error, "event channel full or closed");
                         }

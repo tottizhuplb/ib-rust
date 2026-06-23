@@ -1,71 +1,74 @@
-use ibapi::contracts::tick_types::TickType;
 use ibapi::market_data::realtime::{BidAsk, MarketDepth, MarketDepthL2, MarketDepths, MidPoint, TickTypes, Trade};
 use rust_decimal::Decimal;
 
 use crate::core::model::{
-    now_ns, BookSide, DepthEvent, DepthOperation, MarketEvent, TickByTickEvent, TickByTickType,
-    TopOfBookEvent,
+    mkt_data::mkt_data_event, now_ns, BookSide, DepthOperation, MarketEvent, MktDepthEvent,
+    TickByTickData, TickByTickDataEvent,
 };
 use tokio::sync::mpsc;
 
 use super::super::publish::{try_publish, PublishError};
 use crate::core::model::Symbol;
 
-#[derive(Debug, Default)]
-pub struct TopQuoteState {
-    pub bid: Option<f64>,
-    pub ask: Option<f64>,
-    pub last: Option<f64>,
+pub fn publish_mkt_data(
+    events: &mpsc::Sender<MarketEvent>,
+    req_id: i32,
+    symbol: &Symbol,
+    tick: TickTypes,
+) -> Result<(), PublishError> {
+    try_publish(
+        events,
+        MarketEvent::MktData(mkt_data_event(req_id, symbol, tick)),
+    )
 }
 
-pub fn apply_top_tick(state: &mut TopQuoteState, tick: TickTypes) -> bool {
-    match tick {
-        TickTypes::Price(price) => match price.tick_type {
-            TickType::Bid => {
-                state.bid = Some(price.price);
-                true
-            }
-            TickType::Ask => {
-                state.ask = Some(price.price);
-                true
-            }
-            TickType::Last => {
-                state.last = Some(price.price);
-                true
-            }
-            _ => false,
-        },
-        TickTypes::PriceSize(ps) => match ps.price_tick_type {
-            TickType::Bid => {
-                state.bid = Some(ps.price);
-                true
-            }
-            TickType::Ask => {
-                state.ask = Some(ps.price);
-                true
-            }
-            TickType::Last => {
-                state.last = Some(ps.price);
-                true
-            }
-            _ => false,
-        },
-        _ => false,
-    }
+pub fn publish_mkt_depth(
+    events: &mpsc::Sender<MarketEvent>,
+    update: MarketDepths,
+    req_id: i32,
+    symbol: &Symbol,
+) -> Result<(), PublishError> {
+    let event = match update {
+        MarketDepths::MarketDepth(depth) => {
+            MarketEvent::MktDepth(depth_event_from_l1(req_id, symbol, &depth))
+        }
+        MarketDepths::MarketDepthL2(depth) => {
+            MarketEvent::MktDepth(depth_event_from_l2(req_id, symbol, &depth))
+        }
+    };
+    try_publish(events, event)
 }
 
-pub fn top_of_book_event(req_id: i32, symbol: &Symbol, state: &TopQuoteState) -> TopOfBookEvent {
-    TopOfBookEvent {
-        ts_recv_ns: now_ns(),
-        req_id,
-        symbol: symbol.clone(),
-        bid: state.bid,
-        ask: state.ask,
-        last: state.last,
-    }
+pub fn publish_tick_by_tick(
+    events: &mpsc::Sender<MarketEvent>,
+    req_id: i32,
+    symbol: &Symbol,
+    tick: TickByTickData,
+) -> Result<(), PublishError> {
+    try_publish(
+        events,
+        MarketEvent::TickByTickData(TickByTickDataEvent {
+            ts_recv_ns: now_ns(),
+            req_id,
+            symbol: symbol.clone(),
+            tick,
+        }),
+    )
 }
 
-pub fn depth_event_from_l1(req_id: i32, symbol: &Symbol, depth: &MarketDepth) -> DepthEvent {
+pub fn tick_by_tick_trade(trade: Trade) -> TickByTickData {
+    TickByTickData::Trade(trade)
+}
+
+pub fn tick_by_tick_bid_ask(quote: BidAsk) -> TickByTickData {
+    TickByTickData::BidAsk(quote)
+}
+
+pub fn tick_by_tick_midpoint(midpoint: MidPoint) -> TickByTickData {
+    TickByTickData::MidPoint(midpoint)
+}
+
+fn depth_event_from_l1(req_id: i32, symbol: &Symbol, depth: &MarketDepth) -> MktDepthEvent {
     depth_event(
         req_id,
         symbol,
@@ -79,7 +82,7 @@ pub fn depth_event_from_l1(req_id: i32, symbol: &Symbol, depth: &MarketDepth) ->
     )
 }
 
-pub fn depth_event_from_l2(req_id: i32, symbol: &Symbol, depth: &MarketDepthL2) -> DepthEvent {
+fn depth_event_from_l2(req_id: i32, symbol: &Symbol, depth: &MarketDepthL2) -> MktDepthEvent {
     depth_event(
         req_id,
         symbol,
@@ -103,8 +106,8 @@ fn depth_event(
     size: f64,
     market_maker: Option<String>,
     is_smart_depth: bool,
-) -> DepthEvent {
-    DepthEvent {
+) -> MktDepthEvent {
+    MktDepthEvent {
         ts_recv_ns: now_ns(),
         req_id,
         symbol: symbol.clone(),
@@ -120,106 +123,6 @@ fn depth_event(
         market_maker,
         is_smart_depth,
     }
-}
-
-pub fn publish_top(
-    events: &mpsc::Sender<MarketEvent>,
-    req_id: i32,
-    symbol: &Symbol,
-    state: &TopQuoteState,
-) -> Result<(), PublishError> {
-    try_publish(
-        events,
-        MarketEvent::TopOfBook(top_of_book_event(req_id, symbol, state)),
-    )
-}
-
-pub fn publish_depth(
-    events: &mpsc::Sender<MarketEvent>,
-    update: MarketDepths,
-    req_id: i32,
-    symbol: &Symbol,
-) -> Result<(), PublishError> {
-    let event = match update {
-        MarketDepths::MarketDepth(depth) => MarketEvent::Depth(depth_event_from_l1(req_id, symbol, &depth)),
-        MarketDepths::MarketDepthL2(depth) => {
-            MarketEvent::Depth(depth_event_from_l2(req_id, symbol, &depth))
-        }
-    };
-    try_publish(events, event)
-}
-
-pub fn publish_tick_by_tick_trade(
-    events: &mpsc::Sender<MarketEvent>,
-    req_id: i32,
-    symbol: &Symbol,
-    tick_type: TickByTickType,
-    trade: &Trade,
-) -> Result<(), PublishError> {
-    try_publish(
-        events,
-        MarketEvent::TickByTick(TickByTickEvent {
-            ts_recv_ns: now_ns(),
-            req_id,
-            symbol: symbol.clone(),
-            tick_type,
-            price: trade.price,
-            size: trade.size,
-            bid: None,
-            ask: None,
-            bid_size: None,
-            ask_size: None,
-            exchange: Some(trade.exchange.clone()),
-        }),
-    )
-}
-
-pub fn publish_tick_by_tick_bid_ask(
-    events: &mpsc::Sender<MarketEvent>,
-    req_id: i32,
-    symbol: &Symbol,
-    quote: &BidAsk,
-) -> Result<(), PublishError> {
-    try_publish(
-        events,
-        MarketEvent::TickByTick(TickByTickEvent {
-            ts_recv_ns: now_ns(),
-            req_id,
-            symbol: symbol.clone(),
-            tick_type: TickByTickType::BidAsk,
-            price: 0.0,
-            size: 0.0,
-            bid: Some(quote.bid_price),
-            ask: Some(quote.ask_price),
-            bid_size: Some(quote.bid_size),
-            ask_size: Some(quote.ask_size),
-            exchange: None,
-        }),
-    )
-}
-
-pub fn publish_tick_by_tick_midpoint(
-    events: &mpsc::Sender<MarketEvent>,
-    req_id: i32,
-    symbol: &Symbol,
-    midpoint: &MidPoint,
-) -> Result<(), PublishError> {
-    try_publish(
-        events,
-        MarketEvent::TickByTick(TickByTickEvent {
-            ts_recv_ns: now_ns(),
-            req_id,
-            symbol: symbol.clone(),
-            tick_type: TickByTickType::MidPoint,
-            price: midpoint.mid_point,
-            size: 0.0,
-            bid: None,
-            ask: None,
-            bid_size: None,
-            ask_size: None,
-            exchange: None,
-        }),
-    )
 }
 
 fn decimal_from_f64(value: f64) -> Decimal {

@@ -1,8 +1,8 @@
-//! 行情域：IB 连接、订阅、状态、落盘、快照。
+//! 行情域：IB 连接、订阅、落盘、快照。
 //!
 //! 数据流（当前阶段）：
 //! ```text
-//! IB Gateway → connection → subscription → (events) → wal (event + snapshot) / state
+//! IB Gateway → connection → subscription → (events) → wal (event + snapshot)
 //! ```
 //!
 //! 对外 API（由 `main.rs` 使用）：
@@ -14,12 +14,10 @@ pub mod connection;
 pub mod phase;
 pub mod recorder;
 pub mod runtime;
-pub mod state;
 pub mod subscription;
 
 pub use connection::{ConnectionManager, IbGatewayClient};
 pub use phase::MarketPhase;
 pub use recorder::{MarketWalReader, MarketWalRecord, MarketWalWriter, RecorderService};
 pub use runtime::{register, MarketHandles};
-pub use state::OrderBookStore;
 pub use subscription::SubscriptionManager;

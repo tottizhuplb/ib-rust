@@ -7,7 +7,8 @@ use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use crate::core::model::{now_ns, ConnectionEvent, ControlEvent, MarketEvent, Symbol, TickByTickType};
+use crate::core::model::{now_ns, ConnectionEvent, ControlEvent, MarketEvent, Symbol};
+use crate::market::subscription::TickByTickType;
 use crate::market::config::IbConfig;
 
 use super::adapter::equity_contract;
@@ -147,7 +148,7 @@ impl IbGatewayClient {
                     .request_id()
                     .context("reqTickByTickData subscription missing request_id")?;
                 self.streams
-                    .insert_tick_by_tick_trade(req_id, symbol, tick_type, subscription)
+                    .insert_tick_by_tick_trade(req_id, symbol, subscription)
                     .await;
                 Ok(req_id)
             }
@@ -157,7 +158,7 @@ impl IbGatewayClient {
                     .request_id()
                     .context("reqTickByTickData subscription missing request_id")?;
                 self.streams
-                    .insert_tick_by_tick_trade(req_id, symbol, tick_type, subscription)
+                    .insert_tick_by_tick_trade(req_id, symbol, subscription)
                     .await;
                 Ok(req_id)
             }
