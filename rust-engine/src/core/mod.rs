@@ -12,6 +12,8 @@ pub mod config;
 pub mod model;
 pub mod pipeline;
 pub mod run_state;
+pub mod task;
 
 pub use config::Config;
 pub use run_state::RunState;
+pub use task::{EngineStop, StopReason, TaskGroup, TaskResult, wait_for_signal_or_worker};

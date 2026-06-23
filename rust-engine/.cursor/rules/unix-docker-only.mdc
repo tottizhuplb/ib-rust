@@ -1,0 +1,50 @@
+---
+description: 开发与生产均在 Docker（Linux/Unix），按 Unix 环境编写代码
+alwaysApply: true
+---
+
+# Unix / Docker 环境
+
+本项目**开发与生产都在 Docker 容器内**（Linux）。编写、审查、重构代码时默认 **Unix only**，不要为 Windows 或非 Unix 平台做兼容分支，除非用户明确要求。
+
+## 假定成立
+
+- OS：Linux（`unix` / `target_family = "unix"`）
+- 文件路径：`/` 分隔，POSIX 语义
+- 进程信号：`SIGINT`（Ctrl+C）、`SIGTERM` 可用
+- Shell / 工具链：bash、标准 Unix 命令
+
+## 代码约定
+
+```rust
+// ❌ BAD — 不必要的跨平台分支
+#[cfg(unix)]
+{ ... }
+#[cfg(not(unix))]
+{ tokio::signal::ctrl_c().await?; }
+
+// ✅ GOOD — 直接使用 Unix API
+use tokio::signal::unix::{signal, SignalKind};
+let mut term = signal(SignalKind::terminate())?;
+tokio::select! {
+    _ = tokio::signal::ctrl_c() => {}
+    _ = term.recv() => {}
+}
+```
+
+- 新增 shutdown / 信号处理：优先 `tokio::signal::unix` + `ctrl_c`，监听 `SIGTERM`（Docker stop）
+- 路径：用 `Path` / `PathBuf`，不要硬编码 `\` 或 `C:`
+- 脚本与文档：bash、`#!/usr/bin/env bash`，不用 PowerShell / cmd
+- Docker / Compose：服务名、网络、卷挂载按 Linux 容器假设
+
+## 不要做的事
+
+- 不要添加 `#[cfg(windows)]`、`#[cfg(not(unix))]` 等「以防万一」的分支
+- 不要引入仅 Windows 依赖或路径约定
+- 不要在 README / 脚本里写「Windows 用户请……」除非用户要求
+
+## 审查清单
+
+- [ ] 新代码是否假设 Linux Docker 而非本机 Windows？
+- [ ] 信号、路径、脚本是否与 Unix 一致？
+- [ ] 是否误加了非 Unix 兼容层？

@@ -1,0 +1,69 @@
+---
+description: Tokio 任务与 blocking 线程必须具名，便于日志 thread name 定位
+globs: **/*.rs
+alwaysApply: false
+---
+
+# Tokio 任务 / 线程命名
+
+本项目 logging 已启用 `with_thread_names(true)`。新建或修改 spawn 代码时，**禁止**无名任务/线程。
+
+## 异步 task
+
+使用 `tokio::task::Builder`，名称用 **kebab-case**，与 worker 职责一致（如 `recorder`、`connection-supervisor`）。
+
+```rust
+// ❌ BAD
+tokio::spawn(async move { ... });
+tasks.spawn(async move { ... }); // JoinSet::spawn 内部也是无名 task
+
+// ✅ GOOD — 独立 task
+tokio::task::Builder::new()
+    .name("recorder")
+    .spawn(async move { ... })?;
+
+// ✅ GOOD — 编排层：JoinSet 无法传 name，用 Builder 得到 JoinHandle 再 join
+let mut handles = Vec::new();
+handles.push(
+    tokio::task::Builder::new()
+        .name("recorder")
+        .spawn(async move { RecorderService::run(...).await })?,
+);
+// shutdown 时对 handles 逐个 abort/join，或封装到 core/task.rs 的 spawn_named
+```
+
+`JoinSet::spawn` 本身不支持命名。`main.rs` 这类编排代码应逐步改为 **`tokio::task::Builder::name(...).spawn`**（或 `core/task.rs` 的 `spawn_named` helper），不要裸 `JoinSet::spawn`。
+
+## blocking / OS 线程
+
+```rust
+// ❌ BAD
+tokio::task::spawn_blocking(|| { ... });
+std::thread::spawn(|| { ... });
+
+// ✅ GOOD
+tokio::task::Builder::new()
+    .name("wal-flush")
+    .spawn_blocking(|| { ... })?;
+
+std::thread::Builder::new()
+    .name("wal-flush".into())
+    .spawn(|| { ... })?;
+```
+
+## Runtime worker（仅在自建 `Runtime::builder()` 时）
+
+```rust
+Runtime::builder()
+    .thread_name("engine-worker")
+    // 或 .thread_name_fn(|i| format!("engine-worker-{i}"))
+    .build()?;
+```
+
+`#[tokio::main]` 默认 worker 名为 `tokio-runtime-worker`，可接受；**不要**在业务代码里再叠无名 `spawn`。
+
+## 审查清单
+
+- [ ] 每个 `tokio::spawn` / `JoinSet::spawn` / `spawn_blocking` / `std::thread::spawn` 都有稳定、可读的 name
+- [ ] 名称在日志里能区分 worker（recorder / snapshot / connection / subscription / health 等）
+- [ ] 未引入仅数字或无意义缩写（避免 `task-1`）

@@ -7,6 +7,16 @@ pub struct LoggingConfig {
     pub rotation: LogRotation,
 }
 
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            log_dir: PathBuf::from("./logs"),
+            level: "info".into(),
+            rotation: LogRotation::Daily,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogRotation {
     Daily,
@@ -14,26 +24,10 @@ pub enum LogRotation {
 }
 
 impl LogRotation {
-    pub(crate) fn from_env(value: &str) -> Self {
+    pub(crate) fn parse(value: &str) -> Self {
         match value.to_ascii_lowercase().as_str() {
             "hourly" => Self::Hourly,
             _ => Self::Daily,
-        }
-    }
-}
-
-impl LoggingConfig {
-    pub fn from_env() -> Self {
-        use std::env;
-
-        Self {
-            log_dir: env::var("LOG_DIR")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from("./logs")),
-            level: env::var("LOG_LEVEL").unwrap_or_else(|_| "info".into()),
-            rotation: env::var("LOG_ROTATION")
-                .map(|value| LogRotation::from_env(&value))
-                .unwrap_or(LogRotation::Daily),
         }
     }
 }

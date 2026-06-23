@@ -7,9 +7,9 @@ use tokio::time;
 use tracing::info;
 
 use super::client::IbGatewayClient;
-use crate::market::config::IbConfig;
 use crate::core::model::{now_ns, ConnectionEvent, ControlEvent, MarketEvent};
 use crate::core::pipeline::{EventPublisher, MarketDataSource};
+use crate::market::config::IbConfig;
 
 /// 一次 IB Gateway 会话：连接、保活、断开。
 ///

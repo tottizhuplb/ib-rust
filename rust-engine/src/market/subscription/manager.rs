@@ -3,10 +3,10 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, watch, Mutex};
 use tracing::{info, warn};
 
-use crate::market::subscription::{DesiredSubscription, SubscriptionKind};
 use crate::core::pipeline::SubscriptionControl;
 use crate::core::RunState;
 use crate::market::connection::IbGatewayClient;
+use crate::market::subscription::{DesiredSubscription, SubscriptionKind};
 
 use super::registry::SubscriptionRegistry;
 

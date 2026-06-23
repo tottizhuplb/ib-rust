@@ -6,11 +6,11 @@ use ibapi::prelude::*;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use crate::market::config::IbConfig;
 use crate::core::model::{now_ns, ConnectionEvent, MarketEvent};
 use crate::core::pipeline::{
     EventPublisher, MarketDataSource, SubscriptionControl, SubscriptionId,
 };
+use crate::market::config::IbConfig;
 
 /// IB Gateway 客户端封装；订阅流将桥接为 [`MarketEvent`]。
 pub struct IbGatewayClient {

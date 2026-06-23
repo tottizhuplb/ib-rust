@@ -10,71 +10,63 @@ use crate::market::config::{
 };
 use crate::market::subscription::{DesiredSubscription, SubscriptionEntry};
 
-const DEFAULT_CONFIG_PATH: &str = "conf/config.yaml";
-const DEFAULT_SUBSCRIPTIONS_PATH: &str = "market/subscriptions.yaml";
+const CONFIG_PATH: &str = "conf/config.yaml";
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FileConfig {
-    ib: Option<FileIbConfig>,
-    storage: Option<FileStorageConfig>,
-    pipeline: Option<FilePipelineConfig>,
-    logging: Option<FileLoggingConfig>,
-    paths: Option<FilePathsConfig>,
+    ib: FileIbConfig,
+    storage: FileStorageConfig,
+    pipeline: FilePipelineConfig,
+    logging: FileLoggingConfig,
+    paths: FilePathsConfig,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FileIbConfig {
-    host: Option<String>,
-    port: Option<u16>,
-    client_id: Option<i32>,
+    client_id: i32,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FileStorageConfig {
-    data_dir: Option<PathBuf>,
-    segment_max_bytes: Option<u64>,
+    data_dir: PathBuf,
+    segment_max_bytes: u64,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FilePipelineConfig {
-    event_channel_capacity: Option<usize>,
-    snapshot_channel_capacity: Option<usize>,
-    flush_interval_ms: Option<u64>,
-    snapshot_interval_secs: Option<u64>,
-    reconnect_backoff_secs: Option<u64>,
+    event_channel_capacity: usize,
+    snapshot_channel_capacity: usize,
+    flush_interval_ms: u64,
+    snapshot_interval_secs: u64,
+    reconnect_backoff_secs: u64,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FileLoggingConfig {
-    log_dir: Option<PathBuf>,
-    level: Option<String>,
-    rotation: Option<String>,
+    log_dir: PathBuf,
+    level: String,
+    rotation: String,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct FilePathsConfig {
-    subscriptions: Option<PathBuf>,
+    subscriptions: PathBuf,
 }
 
 pub fn load() -> anyhow::Result<Config> {
-    let path = std::env::var("CONFIG_PATH").unwrap_or_else(|_| DEFAULT_CONFIG_PATH.into());
-    let config_path = PathBuf::from(&path);
+    let config_path = Path::new(CONFIG_PATH);
+    if !config_path.exists() {
+        anyhow::bail!("config file not found: {}", config_path.display());
+    }
 
-    let (mut config, subscriptions_path) = if config_path.exists() {
-        from_yaml(&config_path)?
-    } else {
-        tracing::info!(path = %path, "config file not found, using env defaults");
-        (
-            Config {
-                logging: LoggingConfig::from_env(),
-                market: MarketConfig::from_env(),
-            },
-            subscriptions_path_from(&config_path, None),
-        )
-    };
-
+    let (mut config, subscriptions_path) = from_yaml(config_path)?;
     config.market.subscriptions = load_subscriptions(&subscriptions_path)?;
-    apply_env_overrides(&mut config);
     Ok(config)
 }
 
@@ -83,48 +75,29 @@ fn from_yaml(path: &Path) -> anyhow::Result<(Config, PathBuf)> {
         .with_context(|| format!("read config file {}", path.display()))?;
     let file: FileConfig = serde_yaml::from_str(&text).context("parse config yaml")?;
 
-    let account_mode = AccountMode::from_env(
-        &std::env::var("TRADING_MODE").unwrap_or_else(|_| "paper".into()),
-    );
-
-    let ib_file = file.ib.unwrap_or_default();
-    let host = ib_file.host.unwrap_or_else(|| "ib-gateway".into());
-    let port = ib_file
-        .port
-        .unwrap_or_else(|| resolve_port(&host, account_mode, None));
-
-    let subscriptions_path = subscriptions_path_from(path, file.paths.as_ref());
-
-    let storage_file = file.storage.unwrap_or_default();
-    let pipeline_file = file.pipeline.unwrap_or_default();
-    let logging_file = file.logging.unwrap_or_default();
+    let account_mode = account_mode_from_env()?;
+    let port = resolve_port(account_mode);
+    let subscriptions_path = resolve_path(path, &file.paths.subscriptions);
 
     Ok((
         Config {
-            logging: logging_from_file(&logging_file),
+            logging: logging_from_file(&file.logging)?,
             market: MarketConfig {
                 ib: IbConfig {
-                    host,
                     port,
-                    client_id: ib_file.client_id.unwrap_or(101),
+                    client_id: file.ib.client_id,
                     account_mode,
                 },
                 storage: StorageConfig {
-                    data_dir: storage_file
-                        .data_dir
-                        .unwrap_or_else(|| PathBuf::from("./data")),
-                    segment_max_bytes: storage_file.segment_max_bytes.unwrap_or(256 * 1024 * 1024),
+                    data_dir: file.storage.data_dir,
+                    segment_max_bytes: file.storage.segment_max_bytes,
                 },
                 pipeline: PipelineConfig {
-                    event_channel_capacity: pipeline_file
-                        .event_channel_capacity
-                        .unwrap_or(50_000),
-                    snapshot_channel_capacity: pipeline_file
-                        .snapshot_channel_capacity
-                        .unwrap_or(1_000),
-                    flush_interval_ms: pipeline_file.flush_interval_ms.unwrap_or(500),
-                    snapshot_interval_secs: pipeline_file.snapshot_interval_secs.unwrap_or(30),
-                    reconnect_backoff_secs: pipeline_file.reconnect_backoff_secs.unwrap_or(1),
+                    event_channel_capacity: file.pipeline.event_channel_capacity,
+                    snapshot_channel_capacity: file.pipeline.snapshot_channel_capacity,
+                    flush_interval_ms: file.pipeline.flush_interval_ms,
+                    snapshot_interval_secs: file.pipeline.snapshot_interval_secs,
+                    reconnect_backoff_secs: file.pipeline.reconnect_backoff_secs,
                 },
                 subscriptions: Vec::new(),
             },
@@ -133,68 +106,10 @@ fn from_yaml(path: &Path) -> anyhow::Result<(Config, PathBuf)> {
     ))
 }
 
-fn apply_env_overrides(config: &mut Config) {
-    let env_market = MarketConfig::from_env();
-    let env_logging = LoggingConfig::from_env();
-
-    if std::env::var("IB_HOST").is_ok() {
-        config.market.ib.host = env_market.ib.host;
-    }
-    if std::env::var("IB_PORT").is_ok() {
-        config.market.ib.port = env_market.ib.port;
-    }
-    if std::env::var("IB_CLIENT_ID").is_ok() {
-        config.market.ib.client_id = env_market.ib.client_id;
-    }
-    if std::env::var("TRADING_MODE").is_ok() {
-        config.market.ib.account_mode = env_market.ib.account_mode;
-        if std::env::var("IB_PORT").is_err() {
-            config.market.ib.port = env_market.ib.port;
-        }
-    }
-    if std::env::var("STORAGE_DATA_DIR").is_ok() {
-        config.market.storage.data_dir = env_market.storage.data_dir;
-    }
-    if std::env::var("STORAGE_SEGMENT_MAX_BYTES").is_ok() {
-        config.market.storage.segment_max_bytes = env_market.storage.segment_max_bytes;
-    }
-    if std::env::var("EVENT_CHANNEL_CAPACITY").is_ok() {
-        config.market.pipeline.event_channel_capacity = env_market.pipeline.event_channel_capacity;
-    }
-    if std::env::var("SNAPSHOT_CHANNEL_CAPACITY").is_ok() {
-        config.market.pipeline.snapshot_channel_capacity =
-            env_market.pipeline.snapshot_channel_capacity;
-    }
-    if std::env::var("FLUSH_INTERVAL_MS").is_ok() {
-        config.market.pipeline.flush_interval_ms = env_market.pipeline.flush_interval_ms;
-    }
-    if std::env::var("SNAPSHOT_INTERVAL_SECS").is_ok() {
-        config.market.pipeline.snapshot_interval_secs = env_market.pipeline.snapshot_interval_secs;
-    }
-    if std::env::var("RECONNECT_BACKOFF_SECS").is_ok() {
-        config.market.pipeline.reconnect_backoff_secs = env_market.pipeline.reconnect_backoff_secs;
-    }
-    if std::env::var("LOG_DIR").is_ok() {
-        config.logging.log_dir = env_logging.log_dir;
-    }
-    if std::env::var("LOG_LEVEL").is_ok() {
-        config.logging.level = env_logging.level;
-    }
-    if std::env::var("LOG_ROTATION").is_ok() {
-        config.logging.rotation = env_logging.rotation;
-    }
-}
-
-fn subscriptions_path_from(config_path: &Path, paths: Option<&FilePathsConfig>) -> PathBuf {
-    if let Ok(path) = std::env::var("SUBSCRIPTIONS_PATH") {
-        return PathBuf::from(path);
-    }
-
-    let relative = paths
-        .and_then(|paths| paths.subscriptions.clone())
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_SUBSCRIPTIONS_PATH));
-
-    resolve_path(config_path, &relative)
+fn account_mode_from_env() -> anyhow::Result<AccountMode> {
+    let mode = std::env::var("TRADING_MODE")
+        .context("TRADING_MODE must be set in environment (see .env)")?;
+    Ok(AccountMode::parse(&mode))
 }
 
 fn resolve_path(base_config: &Path, path: &Path) -> PathBuf {
@@ -208,18 +123,12 @@ fn resolve_path(base_config: &Path, path: &Path) -> PathBuf {
         .join(path)
 }
 
-fn logging_from_file(file: &FileLoggingConfig) -> LoggingConfig {
-    let defaults = LoggingConfig::from_env();
-
-    LoggingConfig {
-        log_dir: file.log_dir.clone().unwrap_or(defaults.log_dir),
-        level: file.level.clone().unwrap_or(defaults.level),
-        rotation: file
-            .rotation
-            .as_deref()
-            .map(LogRotation::from_env)
-            .unwrap_or(defaults.rotation),
-    }
+fn logging_from_file(file: &FileLoggingConfig) -> anyhow::Result<LoggingConfig> {
+    Ok(LoggingConfig {
+        log_dir: file.log_dir.clone(),
+        level: file.level.clone(),
+        rotation: LogRotation::parse(&file.rotation),
+    })
 }
 
 fn load_subscriptions(path: &Path) -> anyhow::Result<Vec<DesiredSubscription>> {

@@ -1,4 +1,4 @@
-//! 静态配置：yaml/env 加载与 [`Config`] 模型。
+//! 静态配置：yaml 加载与 [`Config`] 模型。
 
 mod loader;
 

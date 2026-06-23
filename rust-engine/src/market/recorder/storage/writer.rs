@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use zstd::stream::write::Encoder;
 
 use super::{layout, segment, wal};
-use crate::market::config::StorageConfig;
 use crate::core::model::MarketEvent;
 use crate::core::pipeline::EventRecorder;
+use crate::market::config::StorageConfig;
 
 /// 单写者 JSONL 记录器，每段文件 zstd 压缩。
 pub struct JsonlZstdRecorder {

@@ -1,7 +1,5 @@
-# rust-engine 入口配置（启动时加载）
-# 环境变量可覆盖 ib / storage / pipeline / logging 字段
-#
-# CONFIG_PATH=conf/config.yaml cargo run
+# rust-engine 入口配置（启动时加载，唯一配置来源）
+# IB host 固定为 Docker Compose 服务名 ib-gateway；端口由 .env 的 TRADING_MODE 决定
 #
 # 目录约定（均在 conf/ 下）：
 #   config.yaml          基础设施 + 外部文件路径（本文件）
@@ -11,7 +9,6 @@
 #     risk/              （预留）
 
 ib:
-  host: ib-gateway
   client_id: 101
 
 storage:
