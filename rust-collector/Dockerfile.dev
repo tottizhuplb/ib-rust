@@ -7,7 +7,8 @@ ENV PATH="/usr/local/cargo/bin:${PATH}"
 # login shell（docker exec bash -l / 部分 IDE attach）会读 /etc/profile 并重置 PATH
 RUN printf '%s\n' 'export PATH="/usr/local/cargo/bin:$PATH"' > /etc/profile.d/cargo.sh
 
-RUN cargo install cargo-watch
+RUN rustup component add rustfmt \
+    && cargo install cargo-watch
 
 # Pre-fetch dependencies so first `cargo run` is faster (source is mounted at runtime).
 COPY Cargo.toml ./

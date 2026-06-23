@@ -1,4 +1,5 @@
 .env
+data/
 ib-gateway/tws_settings/*
 !ib-gateway/tws_settings/.gitkeep
 target/
