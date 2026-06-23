@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use tokio::sync::{broadcast, mpsc, watch, Mutex};
 use tokio::time::{self, MissedTickBehavior};
-use tracing::{info, warn};
+use tracing::{info, warn, Instrument};
 
 use super::{client::IbGatewayClient, session::IbSession};
 use crate::core::model::{now_ns, ApiErrorEvent, ConnectionEvent, MarketEvent};
@@ -102,18 +102,21 @@ fn spawn_status_logger(
     phase_rx: watch::Receiver<MarketPhase>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) {
-    tokio::spawn(async move {
-        let mut ticker = time::interval(Duration::from_secs(10));
-        ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
-        loop {
-            tokio::select! {
-                _ = ticker.tick() => {
-                    let phase = phase_rx.borrow().clone();
-                    let ib_connected = client.lock().await.is_connected();
-                    info!(phase = ?phase, ib_connected, "connection status");
+    tokio::spawn(
+        async move {
+            let mut ticker = time::interval(Duration::from_secs(10));
+            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    _ = ticker.tick() => {
+                        let phase = phase_rx.borrow().clone();
+                        let ib_connected = client.lock().await.is_connected();
+                        info!(phase = ?phase, ib_connected, "connection status");
+                    }
+                    _ = shutdown_rx.recv() => break,
                 }
-                _ = shutdown_rx.recv() => break,
             }
         }
-    });
+        .instrument(tracing::info_span!("worker", worker = "market-connection")),
+    );
 }
