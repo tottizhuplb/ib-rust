@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, watch, Mutex};
+use tokio::sync::{broadcast, mpsc, watch, Mutex};
 use tracing::info;
 
-use crate::core::pipeline::backpressure::event_channel;
 use crate::core::task::TaskGroup;
 use crate::market::config::{MarketConfig, IB_GATEWAY_HOST};
 use crate::market::MarketPhase;
@@ -39,8 +38,7 @@ pub fn register(
         "registering market domain"
     );
 
-    let (mut event_producer, event_consumer) =
-        event_channel(config.pipeline.event_channel_capacity);
+    let (event_tx, event_rx) = mpsc::channel(config.pipeline.event_channel_capacity);
     let (phase_tx, _phase_rx) = watch::channel(MarketPhase::Starting);
 
     let ib_client = Arc::new(Mutex::new(IbGatewayClient::new(config.ib.clone())));
@@ -55,7 +53,7 @@ pub fn register(
         let snapshot_interval_secs = config.pipeline.snapshot_interval_secs;
         async move {
             RecorderService::run(
-                event_consumer,
+                event_rx,
                 wal_config,
                 books,
                 shutdown_rx,
@@ -74,7 +72,7 @@ pub fn register(
         async move {
             ConnectionManager::run_supervisor(
                 client,
-                &mut event_producer,
+                &event_tx,
                 shutdown_rx,
                 phase_tx,
                 initial_backoff,

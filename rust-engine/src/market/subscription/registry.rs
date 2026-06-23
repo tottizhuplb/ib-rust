@@ -27,8 +27,8 @@ impl SubscriptionRegistry {
         self.desired.values()
     }
 
-    pub fn active(&self) -> impl Iterator<Item = &ActiveSubscription> {
-        self.active.values()
+    pub fn desired_cloned(&self) -> Vec<DesiredSubscription> {
+        self.desired.values().cloned().collect()
     }
 
     pub fn allocate_req_id(&mut self) -> i32 {
@@ -37,20 +37,32 @@ impl SubscriptionRegistry {
         id
     }
 
-    pub fn mark_pending(&mut self, desired: &DesiredSubscription) -> i32 {
-        let req_id = self.allocate_req_id();
+    pub fn begin_pending(&mut self, desired: &DesiredSubscription) {
         let key = desired.key();
-        self.req_id_map.insert(req_id, key.clone());
         self.active.insert(
             key,
             ActiveSubscription {
-                req_id,
+                req_id: -1,
                 symbol: desired.symbol.clone(),
                 kind: desired.kind,
                 status: SubscriptionStatus::Pending,
             },
         );
-        req_id
+    }
+
+    pub fn confirm_active(&mut self, desired: &DesiredSubscription, req_id: i32) {
+        let key = desired.key();
+        self.req_id_map.insert(req_id, key.clone());
+        if let Some(active) = self.active.get_mut(&key) {
+            active.req_id = req_id;
+            active.status = SubscriptionStatus::Active;
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn mark_pending(&mut self, desired: &DesiredSubscription) -> i32 {
+        self.begin_pending(desired);
+        self.allocate_req_id()
     }
 
     pub fn mark_active(&mut self, key: &SubscriptionKey) {
@@ -72,22 +84,6 @@ impl SubscriptionRegistry {
 
     pub fn has_active(&self) -> bool {
         !self.active.is_empty()
-    }
-
-    pub fn keys_to_add(&self) -> Vec<&DesiredSubscription> {
-        self.desired
-            .iter()
-            .filter(|(key, _)| !self.active.contains_key(*key))
-            .map(|(_, sub)| sub)
-            .collect()
-    }
-
-    pub fn keys_to_remove(&self) -> Vec<SubscriptionKey> {
-        self.active
-            .keys()
-            .filter(|key| !self.desired.contains_key(*key))
-            .cloned()
-            .collect()
     }
 
     pub fn resolve_req_id(&self, req_id: i32) -> Option<&SubscriptionKey> {

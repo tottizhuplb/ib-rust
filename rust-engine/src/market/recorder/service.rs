@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
+use tokio::sync::mpsc;
 use tokio::time::{self, Duration};
 use tracing::info;
 
 use crate::core::model::MarketEvent;
-use crate::core::pipeline::EventConsumer;
 use crate::core::wal::WalConfig;
 use super::wal::MarketWalWriter;
 use crate::market::state::OrderBookStore;
@@ -15,7 +15,7 @@ pub struct RecorderService;
 
 impl RecorderService {
     pub async fn run(
-        mut events: EventConsumer,
+        mut events: mpsc::Receiver<MarketEvent>,
         wal_config: WalConfig,
         books: Arc<OrderBookStore>,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,

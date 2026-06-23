@@ -7,6 +7,8 @@
 
 mod adapter;
 mod client;
+mod market_streams;
+mod publish;
 mod session;
 mod supervisor;
 

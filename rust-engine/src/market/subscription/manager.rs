@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, watch, Mutex};
 use tracing::{info, warn};
 
-use crate::core::pipeline::SubscriptionControl;
 use crate::market::connection::IbGatewayClient;
 use crate::market::subscription::{DesiredSubscription, SubscriptionKind};
 use crate::market::MarketPhase;
@@ -45,10 +44,9 @@ impl SubscriptionManager {
         match phase {
             MarketPhase::Connected => self.reconcile().await?,
             MarketPhase::Connecting | MarketPhase::Recovering => {
-                if self.registry.has_active() {
-                    info!("clearing active subscriptions for reconnect");
-                    self.registry.clear_active();
-                }
+                info!("unsubscribing all top and depth for reconnect");
+                self.client.lock().await.unsubscribe_all().await;
+                self.registry.clear_active();
             }
             _ => {}
         }
@@ -56,13 +54,15 @@ impl SubscriptionManager {
     }
 
     pub async fn reconcile(&mut self) -> anyhow::Result<()> {
-        let to_add: Vec<DesiredSubscription> =
-            self.registry.keys_to_add().into_iter().cloned().collect();
+        info!("reconcile: unsubscribe all, then subscribe desired");
+        self.client.lock().await.unsubscribe_all().await;
+        self.registry.clear_active();
 
-        for desired in to_add {
-            let req_id = self.registry.mark_pending(&desired);
+        let to_subscribe = self.registry.desired_cloned();
+
+        for desired in to_subscribe {
+            self.registry.begin_pending(&desired);
             info!(
-                req_id,
                 symbol = %desired.symbol.code,
                 exchange = %desired.symbol.exchange,
                 ?desired.kind,
@@ -73,33 +73,27 @@ impl SubscriptionManager {
             let result = match desired.kind {
                 SubscriptionKind::Top => {
                     let client = self.client.lock().await;
-                    client.subscribe_top(desired.symbol.clone()).await
+                    client.subscribe_market_data(desired.symbol.clone()).await
                 }
                 SubscriptionKind::Depth => {
                     let levels = desired.levels.unwrap_or(10);
                     let client = self.client.lock().await;
-                    client.subscribe_depth(desired.symbol.clone(), levels).await
+                    client
+                        .subscribe_market_depth(desired.symbol.clone(), levels)
+                        .await
                 }
             };
 
             match result {
-                Ok(_actual_req_id) => {
-                    self.registry.mark_active(&desired.key());
+                Ok(req_id) => {
+                    self.registry.confirm_active(&desired, req_id);
                     info!(req_id, "subscription active");
                 }
                 Err(error) => {
                     self.registry.mark_failed(&desired.key());
-                    warn!(req_id, error = %error, "subscription failed");
+                    warn!(error = %error, "subscription failed");
                 }
             }
-        }
-
-        for key in self.registry.keys_to_remove() {
-            warn!(
-                symbol = %key.symbol.code,
-                ?key.kind,
-                "reconcile: would unsubscribe stale active subscription"
-            );
         }
 
         Ok(())

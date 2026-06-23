@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::core::config::Config;
-use crate::core::model::{LogRotation, LoggingConfig};
+use crate::core::model::LoggingConfig;
 use crate::market::config::{
     resolve_port, AccountMode, IbConfig, MarketConfig, PipelineConfig, StorageConfig,
 };
@@ -15,45 +15,22 @@ const CONFIG_PATH: &str = "conf/config.yaml";
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FileConfig {
-    ib: FileIbConfig,
-    storage: FileStorageConfig,
-    pipeline: FilePipelineConfig,
-    logging: FileLoggingConfig,
-    paths: FilePathsConfig,
+    ib: IbSection,
+    storage: StorageConfig,
+    pipeline: PipelineConfig,
+    logging: LoggingConfig,
+    paths: PathsSection,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileIbConfig {
+struct IbSection {
     client_id: i32,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileStorageConfig {
-    data_dir: PathBuf,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FilePipelineConfig {
-    event_channel_capacity: usize,
-    flush_interval_ms: u64,
-    snapshot_interval_secs: u64,
-    reconnect_backoff_secs: u64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FileLoggingConfig {
-    log_dir: PathBuf,
-    level: String,
-    rotation: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FilePathsConfig {
+struct PathsSection {
     subscriptions: PathBuf,
 }
 
@@ -73,27 +50,19 @@ fn from_yaml(path: &Path) -> anyhow::Result<(Config, PathBuf)> {
         .with_context(|| format!("read config file {}", path.display()))?;
     let file: FileConfig = serde_yaml::from_str(&text).context("parse config yaml")?;
 
-    let account_mode = account_mode_from_env()?;
-    let port = resolve_port(account_mode);
+    let port = resolve_port(account_mode_from_env()?);
     let subscriptions_path = resolve_path(path, &file.paths.subscriptions);
 
     Ok((
         Config {
-            logging: logging_from_file(&file.logging)?,
+            logging: file.logging,
             market: MarketConfig {
                 ib: IbConfig {
                     port,
                     client_id: file.ib.client_id,
                 },
-                storage: StorageConfig {
-                    root_dir: file.storage.data_dir,
-                },
-                pipeline: PipelineConfig {
-                    event_channel_capacity: file.pipeline.event_channel_capacity,
-                    flush_interval_ms: file.pipeline.flush_interval_ms,
-                    snapshot_interval_secs: file.pipeline.snapshot_interval_secs,
-                    reconnect_backoff_secs: file.pipeline.reconnect_backoff_secs,
-                },
+                storage: file.storage,
+                pipeline: file.pipeline,
                 subscriptions: Vec::new(),
             },
         },
@@ -118,14 +87,6 @@ fn resolve_path(base_config: &Path, path: &Path) -> PathBuf {
         .join(path)
 }
 
-fn logging_from_file(file: &FileLoggingConfig) -> anyhow::Result<LoggingConfig> {
-    Ok(LoggingConfig {
-        log_dir: file.log_dir.clone(),
-        level: file.level.clone(),
-        rotation: LogRotation::parse(&file.rotation),
-    })
-}
-
 fn load_subscriptions(path: &Path) -> anyhow::Result<Vec<DesiredSubscription>> {
     if !path.exists() {
         tracing::info!(path = %path.display(), "subscriptions file not found, starting with none");
@@ -139,5 +100,5 @@ fn load_subscriptions(path: &Path) -> anyhow::Result<Vec<DesiredSubscription>> {
 
     tracing::info!(path = %path.display(), count = entries.len(), "loaded subscriptions");
 
-    Ok(entries.into_iter().map(Into::into).collect())
+    Ok(entries.into_iter().map(DesiredSubscription::from).collect())
 }

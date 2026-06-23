@@ -726,7 +726,7 @@ name = "rust-engine"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-trait",
+ "futures",
  "ibapi",
  "rust_decimal",
  "serde",

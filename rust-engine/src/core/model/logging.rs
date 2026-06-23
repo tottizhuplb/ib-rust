@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-#[derive(Debug, Clone)]
+use serde::Deserialize;
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LoggingConfig {
     pub log_dir: PathBuf,
     pub level: String,
@@ -17,17 +20,9 @@ impl Default for LoggingConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum LogRotation {
     Daily,
     Hourly,
-}
-
-impl LogRotation {
-    pub(crate) fn parse(value: &str) -> Self {
-        match value.to_ascii_lowercase().as_str() {
-            "hourly" => Self::Hourly,
-            _ => Self::Daily,
-        }
-    }
 }

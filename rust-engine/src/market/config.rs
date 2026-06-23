@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use serde::Deserialize;
+
 use crate::core::wal::WalConfig;
 use crate::market::subscription::DesiredSubscription;
 
@@ -23,9 +25,11 @@ pub struct IbConfig {
     pub client_id: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StorageConfig {
     /// WAL 根目录，各域使用 `{root_dir}/{domain}` 子目录。
+    #[serde(rename = "data_dir")]
     pub root_dir: PathBuf,
 }
 
@@ -42,7 +46,8 @@ impl StorageConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PipelineConfig {
     pub event_channel_capacity: usize,
     pub flush_interval_ms: u64,
