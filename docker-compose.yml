@@ -1,0 +1,44 @@
+services:
+  ib-gateway:
+    image: datawookie/ib-gateway:1026.1h
+    container_name: ib-gateway
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:4001:4001"
+      - "127.0.0.1:4002:4002"
+      - "127.0.0.1:5900:5900"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/4002' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+    networks:
+      - ib-net
+
+  rust-collector:
+    build:
+      context: ./rust-collector
+      dockerfile: Dockerfile
+    container_name: rust-collector
+    restart: unless-stopped
+    depends_on:
+      ib-gateway:
+        condition: service_healthy
+    environment:
+      RUST_LOG: info
+      IB_HOST: ib-gateway
+      IB_PORT: "4002"
+      IB_CLIENT_ID: "101"
+      IB_ACCOUNT_MODE: "paper"
+      TZ: Asia/Hong_Kong
+    working_dir: /app
+    command: ["./collector"]
+    networks:
+      - ib-net
+
+networks:
+  ib-net:
+    driver: bridge
