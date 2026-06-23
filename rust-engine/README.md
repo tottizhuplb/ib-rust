@@ -31,10 +31,10 @@ src/
 │   ├── model/                  # 跨域共享类型（MarketEvent、Symbol…）
 │   ├── pipeline/               # EventPublisher、bounded channel
 │   ├── task.rs                 # TaskGroup · wait_for_signal_or_worker · EngineStop
-│   └── run_state.rs            # 进程编排状态（非落盘事件）
 ├── market/
+│   ├── phase.rs                # MarketPhase（域内 IB 连接编排，watch 广播）
 │   ├── runtime.rs              # register() 向顶层 TaskGroup 注册 worker
-│   ├── config/                 # IB / 存储 / 管道配置模型
+│   ├── config.rs               # IB / 存储 / 管道配置模型
 │   ├── connection/             # supervisor、session、IB adapter
 │   ├── subscription/           # desired → active reconcile
 │   ├── recorder/               # 原始事件 jsonl.zst 落盘
@@ -73,13 +73,13 @@ cargo fmt --all
 
 | Worker（async task） | 职责 |
 |--------------------|------|
-| `market-connection` | IB 连接 supervisor，写 `RunState`，跑 session reader |
-| `market-subscription` | 读 `RunState`，`Connected` 时 reconcile 订阅 |
+| `market-connection` | IB 连接 supervisor，写 `MarketPhase`，跑 session reader |
+| `market-subscription` | 读 `MarketPhase`，`Connected` 时 reconcile 订阅 |
 | `market-recorder` | 消费 `MarketEvent` mpsc，单写盘 jsonl.zst |
 | `market-snapshot` | 周期读内存盘口导出（当前 stub） |
 | `market-health` | 周期 health tick |
 
-`RunState`（`watch`）是进程内编排状态；`MarketEvent::Connection` 是落盘/下游用的领域事件，两者职责不同。
+`MarketPhase`（`watch`，仅 market 域）是 IB 连接编排阶段；`MarketEvent::Connection` 是落盘/下游用的领域事件，两者职责不同。
 
 ## 并发模型
 

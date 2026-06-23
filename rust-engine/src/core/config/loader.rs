@@ -39,7 +39,6 @@ struct FileStorageConfig {
 #[serde(deny_unknown_fields)]
 struct FilePipelineConfig {
     event_channel_capacity: usize,
-    snapshot_channel_capacity: usize,
     flush_interval_ms: u64,
     snapshot_interval_secs: u64,
     reconnect_backoff_secs: u64,
@@ -86,7 +85,6 @@ fn from_yaml(path: &Path) -> anyhow::Result<(Config, PathBuf)> {
                 ib: IbConfig {
                     port,
                     client_id: file.ib.client_id,
-                    account_mode,
                 },
                 storage: StorageConfig {
                     data_dir: file.storage.data_dir,
@@ -94,7 +92,6 @@ fn from_yaml(path: &Path) -> anyhow::Result<(Config, PathBuf)> {
                 },
                 pipeline: PipelineConfig {
                     event_channel_capacity: file.pipeline.event_channel_capacity,
-                    snapshot_channel_capacity: file.pipeline.snapshot_channel_capacity,
                     flush_interval_ms: file.pipeline.flush_interval_ms,
                     snapshot_interval_secs: file.pipeline.snapshot_interval_secs,
                     reconnect_backoff_secs: file.pipeline.reconnect_backoff_secs,

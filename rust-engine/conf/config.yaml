@@ -17,7 +17,6 @@ storage:
 
 pipeline:
   event_channel_capacity: 50000
-  snapshot_channel_capacity: 1000
   flush_interval_ms: 500
   snapshot_interval_secs: 30
   reconnect_backoff_secs: 1

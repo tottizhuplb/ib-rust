@@ -5,8 +5,8 @@ use tracing::info;
 
 use crate::core::pipeline::EventPublisher;
 use crate::core::task::TaskGroup;
-use crate::core::RunState;
 use crate::market::config::{MarketConfig, IB_GATEWAY_HOST};
+use crate::market::MarketPhase;
 use crate::market::{
     ConnectionManager, HealthService, IbGatewayClient, JsonlZstdRecorder, OrderBookStore,
     RecorderService, SnapshotService, SubscriptionManager,
@@ -14,13 +14,13 @@ use crate::market::{
 
 /// market 域 shutdown 句柄（worker 由顶层 [`TaskGroup`] 统一 join）。
 pub struct MarketHandles {
-    state_tx: watch::Sender<RunState>,
+    phase_tx: watch::Sender<MarketPhase>,
     event_tx: tokio::sync::mpsc::Sender<crate::core::model::MarketEvent>,
 }
 
 impl MarketHandles {
     pub fn begin_shutdown(self, shutdown_tx: &broadcast::Sender<()>) {
-        let _ = self.state_tx.send(RunState::ShuttingDown);
+        let _ = self.phase_tx.send(MarketPhase::ShuttingDown);
         let _ = shutdown_tx.send(());
         drop(self.event_tx);
     }
@@ -42,7 +42,7 @@ pub fn register(
 
     let (event_tx, event_rx) =
         crate::core::pipeline::backpressure::event_channel(config.pipeline.event_channel_capacity);
-    let (state_tx, _state_rx) = watch::channel(RunState::Starting);
+    let (phase_tx, _phase_rx) = watch::channel(MarketPhase::Starting);
 
     let publisher: Arc<dyn EventPublisher> =
         crate::core::pipeline::MpscPublisher::new(event_tx.clone());
@@ -75,14 +75,14 @@ pub fn register(
         let client = Arc::clone(&ib_client);
         let publisher = Arc::clone(&publisher);
         let shutdown_rx = shutdown_tx.subscribe();
-        let state_tx = state_tx.clone();
+        let phase_tx = phase_tx.clone();
         let initial_backoff = config.pipeline.reconnect_backoff_secs;
         async move {
             ConnectionManager::run_supervisor(
                 client,
                 publisher,
                 shutdown_rx,
-                state_tx,
+                phase_tx,
                 initial_backoff,
             )
             .await
@@ -93,19 +93,19 @@ pub fn register(
         let desired = config.subscriptions.clone();
         let client = Arc::clone(&ib_client);
         let shutdown_rx = shutdown_tx.subscribe();
-        let sub_state_rx = state_tx.subscribe();
+        let phase_rx = phase_tx.subscribe();
         async move {
             SubscriptionManager::new(desired, client)
-                .run(sub_state_rx, shutdown_rx)
+                .run(phase_rx, shutdown_rx)
                 .await
         }
     });
 
     tasks.spawn_named("market-health", {
         let shutdown_rx = shutdown_tx.subscribe();
-        let state_rx = state_tx.subscribe();
-        async move { HealthService::run(shutdown_rx, state_rx).await }
+        let phase_rx = phase_tx.subscribe();
+        async move { HealthService::run(shutdown_rx, phase_rx).await }
     });
 
-    Ok(MarketHandles { state_tx, event_tx })
+    Ok(MarketHandles { phase_tx, event_tx })
 }

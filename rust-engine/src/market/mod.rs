@@ -12,6 +12,7 @@
 pub mod config;
 pub mod connection;
 pub mod health;
+pub mod phase;
 pub mod recorder;
 pub mod runtime;
 pub mod snapshot;
@@ -20,6 +21,7 @@ pub mod subscription;
 
 pub use connection::{ConnectionManager, IbGatewayClient};
 pub use health::HealthService;
+pub use phase::MarketPhase;
 pub use recorder::{JsonlZstdRecorder, RecorderService};
 pub use runtime::{register, MarketHandles};
 pub use snapshot::SnapshotService;

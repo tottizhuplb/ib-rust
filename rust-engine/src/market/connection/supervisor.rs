@@ -8,7 +8,7 @@ use tracing::warn;
 use super::{client::IbGatewayClient, session::IbSession};
 use crate::core::model::{now_ns, ApiErrorEvent, ConnectionEvent, MarketEvent};
 use crate::core::pipeline::EventPublisher;
-use crate::core::RunState;
+use crate::market::MarketPhase;
 
 pub struct ConnectionManager;
 
@@ -17,17 +17,17 @@ impl ConnectionManager {
         client: Arc<Mutex<IbGatewayClient>>,
         publisher: Arc<dyn EventPublisher>,
         mut shutdown_rx: broadcast::Receiver<()>,
-        state_tx: watch::Sender<RunState>,
+        phase_tx: watch::Sender<MarketPhase>,
         initial_backoff_secs: u64,
     ) -> anyhow::Result<()> {
         let mut backoff_secs = initial_backoff_secs.max(1);
 
         loop {
-            let _ = state_tx.send(RunState::Connecting);
+            let _ = phase_tx.send(MarketPhase::Connecting);
 
             match IbSession::connect_shared(Arc::clone(&client), Arc::clone(&publisher)).await {
                 Ok(mut session) => {
-                    let _ = state_tx.send(RunState::Connected);
+                    let _ = phase_tx.send(MarketPhase::Connected);
                     backoff_secs = initial_backoff_secs.max(1);
 
                     if !session.wait_until_ready().await? {
@@ -51,7 +51,7 @@ impl ConnectionManager {
                         }
                     }
 
-                    let _ = state_tx.send(RunState::Recovering);
+                    let _ = phase_tx.send(MarketPhase::Recovering);
                     let _ =
                         publisher.publish(MarketEvent::Connection(ConnectionEvent::Disconnected {
                             reason: "recovering".into(),
@@ -71,7 +71,7 @@ impl ConnectionManager {
                         code: -1,
                         message: format!("connect failed: {error:#}"),
                     }));
-                    let _ = state_tx.send(RunState::Recovering);
+                    let _ = phase_tx.send(MarketPhase::Recovering);
 
                     tokio::select! {
                         _ = time::sleep(Duration::from_secs(backoff_secs)) => {}

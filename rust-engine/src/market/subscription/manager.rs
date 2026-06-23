@@ -4,9 +4,9 @@ use tokio::sync::{broadcast, watch, Mutex};
 use tracing::{info, warn};
 
 use crate::core::pipeline::SubscriptionControl;
-use crate::core::RunState;
 use crate::market::connection::IbGatewayClient;
 use crate::market::subscription::{DesiredSubscription, SubscriptionKind};
+use crate::market::MarketPhase;
 
 use super::registry::SubscriptionRegistry;
 
@@ -26,25 +26,25 @@ impl SubscriptionManager {
 
     pub async fn run(
         mut self,
-        mut state_rx: watch::Receiver<RunState>,
+        mut phase_rx: watch::Receiver<MarketPhase>,
         mut shutdown_rx: broadcast::Receiver<()>,
     ) -> anyhow::Result<()> {
         loop {
             tokio::select! {
-                changed = state_rx.changed() => {
+                changed = phase_rx.changed() => {
                     changed?;
-                    let state = state_rx.borrow().clone();
-                    self.handle_state(state).await?;
+                    let phase = phase_rx.borrow().clone();
+                    self.handle_phase(phase).await?;
                 }
                 _ = shutdown_rx.recv() => return Ok(()),
             }
         }
     }
 
-    async fn handle_state(&mut self, state: RunState) -> anyhow::Result<()> {
-        match state {
-            RunState::Connected => self.reconcile().await?,
-            RunState::Connecting | RunState::Recovering => {
+    async fn handle_phase(&mut self, phase: MarketPhase) -> anyhow::Result<()> {
+        match phase {
+            MarketPhase::Connected => self.reconcile().await?,
+            MarketPhase::Connecting | MarketPhase::Recovering => {
                 if self.registry.has_active() {
                     info!("clearing active subscriptions for reconnect");
                     self.registry.clear_active();

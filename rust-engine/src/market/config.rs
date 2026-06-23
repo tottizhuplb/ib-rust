@@ -17,7 +17,6 @@ pub struct MarketConfig {
 pub struct IbConfig {
     pub port: u16,
     pub client_id: i32,
-    pub account_mode: AccountMode,
 }
 
 #[derive(Debug, Clone)]
@@ -29,7 +28,6 @@ pub struct StorageConfig {
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
     pub event_channel_capacity: usize,
-    pub snapshot_channel_capacity: usize,
     pub flush_interval_ms: u64,
     pub snapshot_interval_secs: u64,
     pub reconnect_backoff_secs: u64,

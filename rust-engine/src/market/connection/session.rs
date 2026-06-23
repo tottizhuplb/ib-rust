@@ -49,7 +49,7 @@ impl IbSession {
         Self::connect_shared(client, publisher).await
     }
 
-    /// 会话就绪 — Subscription Manager 监听 [`RunState`] 并 reconcile。
+    /// 会话就绪 — Subscription Manager 监听 [`MarketPhase`] 并 reconcile。
     pub async fn wait_until_ready(&mut self) -> anyhow::Result<bool> {
         let ready = {
             let guard = self.client.lock().await;
