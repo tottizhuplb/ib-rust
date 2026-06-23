@@ -1,0 +1,14 @@
+FROM rust:1-bookworm
+
+WORKDIR /app
+
+RUN cargo install cargo-watch
+
+# Pre-fetch dependencies so first `cargo run` is faster (source is mounted at runtime).
+COPY Cargo.toml ./
+RUN mkdir src \
+    && echo "fn main() {}" > src/main.rs \
+    && cargo fetch \
+    && rm -rf src
+
+CMD ["cargo", "watch", "-w", "src", "-w", "Cargo.toml", "-x", "run"]
