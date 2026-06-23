@@ -14,7 +14,7 @@ Gateway 镜像：[gnzsnz/ib-gateway-docker](https://github.com/gnzsnz/ib-gateway
 │   └── tws_settings/       # 设置持久化 → 容器 ${TWS_SETTINGS_PATH}
 └── rust-collector/         # Rust 采集器源码
     ├── Dockerfile          # 生产镜像（release 二进制）
-    ├── Dockerfile.dev      # 开发镜像（cargo-watch 热重载）
+    ├── Dockerfile.dev      # 开发镜像（Rust 工具链 + cargo-watch）
     └── src/
 ```
 
@@ -48,21 +48,27 @@ VNC 地址：`127.0.0.1:5900`
 
 ### 开发模式（推荐）
 
-挂载本地源码，修改代码后自动重新编译运行。本机无需安装 Rust。
+挂载本地源码，在容器内开发。本机无需安装 Rust。
 
 ```bash
-docker compose --profile dev up --build
+# 启动开发容器（需 ib-gateway 已 healthy）
+docker compose --profile dev up -d --build rust-dev
+
+# 进入容器（推荐）
+docker exec -it rust-dev bash
 ```
 
-- 源码目录 `./rust-collector` 挂载到容器内 `/app`
-- 依赖与编译缓存保存在 Docker volume 中，避免 macOS 上编译过慢
-- 修改 `src/` 或 `Cargo.toml` 后，`cargo watch` 会自动触发 `cargo run`
-
-查看日志：
+容器内常用命令：
 
 ```bash
-docker compose logs -f rust-collector-dev
+cargo run          # 运行 collector
+cargo build        # 编译
+cargo test         # 测试
+cargo watch -x run # 改代码自动重跑（可选）
 ```
+
+- 源码 `./rust-collector` 挂载到容器 `/app`，宿主机改代码容器内即时可见
+- 依赖与编译缓存保存在 Docker volume，避免 macOS bind mount 编译过慢
 
 停止：
 

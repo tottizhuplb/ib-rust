@@ -3,7 +3,8 @@
 #
 # 启动方式：
 #   仅 Gateway：  docker compose up ib-gateway
-#   开发模式：    docker compose --profile dev up --build
+#   开发模式：    docker compose --profile dev up -d --build rust-dev
+#                 docker exec -it rust-dev bash
 #   生产模式：    docker compose --profile prod up -d --build
 #
 # 说明：不带 profile 的 `docker compose up` 只会启动 ib-gateway，
@@ -73,20 +74,24 @@ services:
     command: ["./collector"]
 
   # ---------------------------------------------------------------------------
-  # 开发 collector：挂载本地源码，cargo-watch 改代码自动重编译
+  # Rust 开发容器：挂载源码，进入容器内手动 cargo build / run / test
+  #   docker compose --profile dev up -d --build rust-dev
+  #   docker exec -it rust-dev bash
   # ---------------------------------------------------------------------------
-  rust-collector-dev:
+  rust-dev:
     <<: *rust-collector-base
     profiles: ["dev"]
     build:
       context: ./rust-collector
-      dockerfile: Dockerfile.dev # rust 工具链 + cargo-watch
-    container_name: rust-collector-dev
+      dockerfile: Dockerfile.dev
+    container_name: rust-dev
+    stdin_open: true
+    tty: true
     volumes:
-      - ./rust-collector:/app                              # 源码 bind mount，本地改代码容器内可见
-      - rust-collector-cargo-registry:/usr/local/cargo/registry # 依赖缓存（加速编译，避免写回 macOS 本地盘）
+      - ./rust-collector:/app
+      - rust-collector-cargo-registry:/usr/local/cargo/registry
       - rust-collector-cargo-git:/usr/local/cargo/git
-      - rust-collector-target:/app/target                  # 编译产物缓存（同上，仅 dev 使用）
+      - rust-collector-target:/app/target
 
 # 容器间通信网络（ib-gateway ↔ rust-collector）
 networks:
