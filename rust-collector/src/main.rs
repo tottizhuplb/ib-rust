@@ -17,6 +17,6 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    let config = config::Config::from_env();
-    app::App::new(config)?.run().await
+    let config = config::Config::load()?;
+    app::App::new(config).run().await
 }

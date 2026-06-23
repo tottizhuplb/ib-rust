@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
-use crate::config::AccountMode;
+mod file;
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub ib: IbConfig,
     pub storage: StorageConfig,
     pub pipeline: PipelineConfig,
+    pub subscriptions: Vec<crate::domain::DesiredSubscription>,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +28,9 @@ pub struct StorageConfig {
 pub struct PipelineConfig {
     pub event_channel_capacity: usize,
     pub snapshot_channel_capacity: usize,
+    pub flush_interval_ms: u64,
+    pub snapshot_interval_secs: u64,
+    pub reconnect_backoff_secs: u64,
 }
 
 impl Config {
@@ -70,7 +74,20 @@ impl Config {
                     .ok()
                     .and_then(|value| value.parse().ok())
                     .unwrap_or(1_000),
+                flush_interval_ms: env::var("FLUSH_INTERVAL_MS")
+                    .ok()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(500),
+                snapshot_interval_secs: env::var("SNAPSHOT_INTERVAL_SECS")
+                    .ok()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(30),
+                reconnect_backoff_secs: env::var("RECONNECT_BACKOFF_SECS")
+                    .ok()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(1),
             },
+            subscriptions: Vec::new(),
         }
     }
 }
@@ -88,7 +105,7 @@ pub enum AccountMode {
 }
 
 impl AccountMode {
-    fn from_env(value: &str) -> Self {
+    pub(crate) fn from_env(value: &str) -> Self {
         match value.to_ascii_lowercase().as_str() {
             "live" => Self::Live,
             _ => Self::Paper,
@@ -110,7 +127,7 @@ impl AccountMode {
     }
 }
 
-fn resolve_port(host: &str, account_mode: AccountMode, explicit_port: Option<u16>) -> u16 {
+pub(crate) fn resolve_port(host: &str, account_mode: AccountMode, explicit_port: Option<u16>) -> u16 {
     if let Some(port) = explicit_port {
         return port;
     }
