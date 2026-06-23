@@ -1,11 +1,9 @@
-//! 原始事件持久化：批量、flush、分段 jsonl.zst 文件。
+//! 统一 WAL：event / snapshot 交错写入，全局 seq。
 //!
 //! 对外 API：
 //! - [`RecorderService::run`]
-//! - [`JsonlZstdRecorder`]
+//! - market 域 WAL：[`crate::market::wal`]
 
 mod service;
-mod storage;
 
 pub use service::RecorderService;
-pub use storage::JsonlZstdRecorder;

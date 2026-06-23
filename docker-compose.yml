@@ -3,9 +3,9 @@
 #
 # 启动方式：
 #   仅 Gateway：  docker compose up ib-gateway
-#   开发模式：    docker compose --profile dev up -d --build rust-dev
-#                 docker exec -it rust-dev bash
-#   生产模式：    docker compose --profile prod up -d --build
+#   开发模式：    docker compose --profile dev up -d --build rust-engine-dev
+#                 docker exec -it rust-engine-dev bash
+#   生产模式：    docker compose --profile prod up -d --build rust-engine
 #
 # 说明：不带 profile 的 `docker compose up` 只会启动 ib-gateway，
 #       engine 需通过 dev / prod profile 显式选择。
@@ -78,16 +78,16 @@ services:
 
   # ---------------------------------------------------------------------------
   # Rust 开发容器：挂载源码，进入容器内手动 cargo build / run / test
-  #   docker compose --profile dev up -d --build rust-dev
-  #   docker exec -it rust-dev bash
+  #   docker compose --profile dev up -d --build rust-engine-dev
+  #   docker exec -it rust-engine-dev bash
   # ---------------------------------------------------------------------------
-  rust-dev:
+  rust-engine-dev:
     <<: *rust-engine-base
     profiles: ["dev"]
     build:
       context: ./rust-engine
       dockerfile: Dockerfile.dev
-    container_name: rust-dev
+    container_name: rust-engine-dev
     stdin_open: true
     tty: true
     volumes:

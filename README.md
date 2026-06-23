@@ -6,13 +6,13 @@ Rust 引擎架构与模块说明见 [rust-engine/README.md](rust-engine/README.m
 
 ```bash
 # 1. Gateway
-docker compose up ib-gateway
+docker compose up ib-gateway -d
 
-# 2. 生产
-docker compose --profile prod up -d --build
+# 2. 生产引擎
+docker compose --profile prod up -d --build rust-engine
 
-# 3. 开发
-docker compose --profile dev up -d --build rust-dev
+# 3. 开发引擎
+docker compose --profile dev up -d --build rust-engine-dev
 ```
 
 ### IB Gateway VNC（2FA / 登录界面）

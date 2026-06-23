@@ -2,7 +2,7 @@
 //!
 //! 数据流（当前阶段）：
 //! ```text
-//! IB Gateway → connection → subscription → (events) → recorder / state → snapshot
+//! IB Gateway → connection → subscription → (events) → wal (event + snapshot) / state
 //! ```
 //!
 //! 对外 API（由 `main.rs` 使用）：
@@ -18,12 +18,14 @@ pub mod runtime;
 pub mod snapshot;
 pub mod state;
 pub mod subscription;
+pub mod wal;
 
 pub use connection::{ConnectionManager, IbGatewayClient};
 pub use health::HealthService;
 pub use phase::MarketPhase;
-pub use recorder::{JsonlZstdRecorder, RecorderService};
+pub use recorder::RecorderService;
 pub use runtime::{register, MarketHandles};
 pub use snapshot::SnapshotService;
 pub use state::OrderBookStore;
 pub use subscription::SubscriptionManager;
+pub use wal::{MarketWalReader, MarketWalRecord, MarketWalWriter};

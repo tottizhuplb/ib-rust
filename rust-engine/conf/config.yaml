@@ -12,13 +12,14 @@ ib:
   client_id: 101
 
 storage:
-  data_dir: ./data
+  data_dir: ./data          # WAL 根目录；market 落盘于 ./data/market
   segment_max_bytes: 268435456
+  wal_rotation: hourly      # hourly | size
 
 pipeline:
   event_channel_capacity: 50000
   flush_interval_ms: 500
-  snapshot_interval_secs: 30
+  snapshot_interval_secs: 60
   reconnect_backoff_secs: 1
 
 logging:

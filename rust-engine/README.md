@@ -28,6 +28,7 @@ src/
 ├── logging.rs                  # 文件 + stdout 日志（含线程名）
 ├── core/
 │   ├── config/                 # conf/ yaml 加载
+│   ├── wal/                    # 域无关 WAL（rotation、checkpoint、读写）
 │   ├── model/                  # 跨域共享类型（MarketEvent、Symbol…）
 │   ├── pipeline/               # EventPublisher、bounded channel
 │   ├── task.rs                 # TaskGroup · wait_for_signal_or_worker · EngineStop
@@ -37,7 +38,8 @@ src/
 │   ├── config.rs               # IB / 存储 / 管道配置模型
 │   ├── connection/             # supervisor、session、IB adapter
 │   ├── subscription/           # desired → active reconcile
-│   ├── recorder/               # 原始事件 jsonl.zst 落盘
+│   ├── recorder/               # market 域 WAL 消费（event 写入）
+│   ├── wal/                      # market 域 WAL 记录 schema
 │   ├── state/                  # 内存盘口
 │   ├── snapshot/               # 周期导出
 │   └── health/
@@ -49,6 +51,26 @@ src/
 ## 配置
 
 看 `conf/config.yaml` 和 `conf/market/subscriptions.yaml` 即可；yaml 里已有注释。运行时还需环境变量 `TRADING_MODE`（`paper` / `live`）。
+
+### WAL 落盘
+
+单条 log 交错写入 **event** 与 **snapshot**，全局单调 `seq`：
+
+```json
+{"kind":"event","seq":1,"ts_ns":...,"event":{"Connection":...}}
+{"kind":"event","seq":2,"ts_ns":...,"event":{"Depth":...}}
+{"kind":"snapshot","seq":3,"ts_ns":...,"as_of_seq":2,"books":[...]}
+```
+
+- 根目录：`storage.data_dir`（默认 `./data`）；market 域 WAL：`./data/market/`
+- 段文件：按 UTC 小时 `wal-YYYYMMDDHH.jsonl`（超出 `segment_max_bytes` 时 `-002` 分片）
+- checkpoint：`./data/market/wal.meta`
+- 明文 JSONL，可 `tail -f` 边写边读
+- 通用读写：[`core::wal`](src/core/wal/mod.rs)；market 记录类型：[`market::wal`](src/market/wal/mod.rs)
+
+```bash
+tail -f data/market/wal-$(date -u +%Y%m%d%H).jsonl | jq .
+```
 
 ## 启动
 
@@ -75,8 +97,8 @@ cargo fmt --all
 |--------------------|------|
 | `market-connection` | IB 连接 supervisor，写 `MarketPhase`，跑 session reader |
 | `market-subscription` | 读 `MarketPhase`，`Connected` 时 reconcile 订阅 |
-| `market-recorder` | 消费 `MarketEvent` mpsc，单写盘 jsonl.zst |
-| `market-snapshot` | 周期读内存盘口导出（当前 stub） |
+| `market-recorder` | 消费 `MarketEvent`，写 WAL（event + 内存盘口更新） |
+| `market-snapshot` | 定时把盘口快照写入同一 WAL |
 | `market-health` | 周期 health tick |
 
 `MarketPhase`（`watch`，仅 market 域）是 IB 连接编排阶段；`MarketEvent::Connection` 是落盘/下游用的领域事件，两者职责不同。

@@ -12,6 +12,8 @@ pub mod config;
 pub mod model;
 pub mod pipeline;
 pub mod task;
+pub mod wal;
 
 pub use config::Config;
 pub use task::{wait_for_signal_or_worker, EngineStop, StopReason, TaskGroup, TaskResult};
+pub use wal::{WalConfig, WalRotation};

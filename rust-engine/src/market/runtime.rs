@@ -8,9 +8,10 @@ use crate::core::task::TaskGroup;
 use crate::market::config::{MarketConfig, IB_GATEWAY_HOST};
 use crate::market::MarketPhase;
 use crate::market::{
-    ConnectionManager, HealthService, IbGatewayClient, JsonlZstdRecorder, OrderBookStore,
-    RecorderService, SnapshotService, SubscriptionManager,
+    ConnectionManager, HealthService, IbGatewayClient, OrderBookStore, RecorderService,
+    SnapshotService, SubscriptionManager,
 };
+use crate::market::wal::MarketWalWriter;
 
 /// market 域 shutdown 句柄（worker 由顶层 [`TaskGroup`] 统一 join）。
 pub struct MarketHandles {
@@ -35,7 +36,8 @@ pub fn register(
         host = IB_GATEWAY_HOST,
         port = config.ib.port,
         client_id = config.ib.client_id,
-        data_dir = %config.storage.data_dir.display(),
+        wal_dir = %config.storage.wal_data_dir().display(),
+        snapshot_interval_secs = config.pipeline.snapshot_interval_secs,
         desired_subscriptions = config.subscriptions.len(),
         "registering market domain"
     );
@@ -53,22 +55,24 @@ pub fn register(
     )));
 
     let books = Arc::new(OrderBookStore::new());
-    let recorder = JsonlZstdRecorder::new(config.storage.clone())?;
+    let wal = Arc::new(Mutex::new(MarketWalWriter::new(config.storage.wal_config())?));
 
     tasks.spawn_named("market-recorder", {
+        let wal = Arc::clone(&wal);
+        let books = Arc::clone(&books);
         let shutdown_rx = shutdown_tx.subscribe();
         let flush_interval_ms = config.pipeline.flush_interval_ms;
         async move {
-            RecorderService::run(event_rx, recorder, shutdown_rx, flush_interval_ms).await
+            RecorderService::run(event_rx, wal, books, shutdown_rx, flush_interval_ms).await
         }
     });
 
     tasks.spawn_named("market-snapshot", {
+        let wal = Arc::clone(&wal);
         let books = Arc::clone(&books);
-        let storage = config.storage.clone();
         let shutdown_rx = shutdown_tx.subscribe();
         let interval_secs = config.pipeline.snapshot_interval_secs;
-        async move { SnapshotService::run(books, storage, shutdown_rx, interval_secs).await }
+        async move { SnapshotService::run(books, wal, shutdown_rx, interval_secs).await }
     });
 
     tasks.spawn_named("market-connection", {
