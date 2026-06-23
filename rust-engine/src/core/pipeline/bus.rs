@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::core::model::MarketEvent;
+use super::EventProducer;
 
 #[derive(Debug, Clone)]
 pub enum PublishError {
@@ -19,16 +19,12 @@ impl fmt::Display for PublishError {
 
 impl std::error::Error for PublishError {}
 
-pub trait EventPublisher: Send + Sync {
-    fn publish(&self, event: MarketEvent) -> Result<(), PublishError>;
-}
-
 pub type SubscriptionId = i32;
 
 #[async_trait::async_trait]
 pub trait MarketDataSource: Send {
-    async fn connect(&mut self) -> anyhow::Result<()>;
-    async fn disconnect(&mut self) -> anyhow::Result<()>;
+    async fn connect(&mut self, events: &mut EventProducer) -> anyhow::Result<()>;
+    async fn disconnect(&mut self, events: &mut EventProducer) -> anyhow::Result<()>;
     async fn is_connected(&self) -> bool;
 }
 
@@ -51,7 +47,7 @@ pub trait SubscriptionControl: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait EventRecorder: Send {
-    async fn append(&mut self, event: &MarketEvent) -> anyhow::Result<()>;
+    async fn append(&mut self, event: &crate::core::model::MarketEvent) -> anyhow::Result<()>;
     async fn flush(&mut self) -> anyhow::Result<()>;
     async fn rotate_if_needed(&mut self) -> anyhow::Result<()>;
 }

@@ -32,13 +32,6 @@ struct FileIbConfig {
 #[serde(deny_unknown_fields)]
 struct FileStorageConfig {
     data_dir: PathBuf,
-    segment_max_bytes: u64,
-    #[serde(default = "default_wal_rotation")]
-    wal_rotation: String,
-}
-
-fn default_wal_rotation() -> String {
-    "hourly".into()
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,8 +87,6 @@ fn from_yaml(path: &Path) -> anyhow::Result<(Config, PathBuf)> {
                 },
                 storage: StorageConfig {
                     root_dir: file.storage.data_dir,
-                    segment_max_bytes: file.storage.segment_max_bytes,
-                    wal_rotation: crate::core::wal::WalRotation::parse(&file.storage.wal_rotation),
                 },
                 pipeline: PipelineConfig {
                     event_channel_capacity: file.pipeline.event_channel_capacity,

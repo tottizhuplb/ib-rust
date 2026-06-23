@@ -63,13 +63,12 @@ src/
 ```
 
 - 根目录：`storage.data_dir`（默认 `./data`）；market 域 WAL：`./data/market/`
-- 段文件：按 UTC 小时 `wal-YYYYMMDDHH.jsonl`（超出 `segment_max_bytes` 时 `-002` 分片）
-- checkpoint：`./data/market/wal.meta`
+- 单文件：`wal.jsonl`；checkpoint：`wal.meta`
 - 明文 JSONL，可 `tail -f` 边写边读
 - 通用读写：[`core::wal`](src/core/wal/mod.rs)；market 记录类型：[`market::wal`](src/market/wal/mod.rs)
 
 ```bash
-tail -f data/market/wal-$(date -u +%Y%m%d%H).jsonl | jq .
+tail -f data/market/wal.jsonl | jq .
 ```
 
 ## 启动

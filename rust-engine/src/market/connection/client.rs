@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
@@ -8,22 +7,20 @@ use tracing::{info, warn};
 
 use crate::core::model::{now_ns, ConnectionEvent, MarketEvent};
 use crate::core::pipeline::{
-    EventPublisher, MarketDataSource, SubscriptionControl, SubscriptionId,
+    EventProducer, MarketDataSource, SubscriptionControl, SubscriptionId,
 };
 use crate::market::config::IbConfig;
 
 /// IB Gateway 客户端封装；订阅流将桥接为 [`MarketEvent`]。
 pub struct IbGatewayClient {
     config: IbConfig,
-    publisher: Arc<dyn EventPublisher>,
     client: Option<Client>,
 }
 
 impl IbGatewayClient {
-    pub fn new(config: IbConfig, publisher: Arc<dyn EventPublisher>) -> Self {
+    pub fn new(config: IbConfig) -> Self {
         Self {
             config,
-            publisher,
             client: None,
         }
     }
@@ -32,7 +29,7 @@ impl IbGatewayClient {
         self.client.as_ref()
     }
 
-    async fn connect_with_retry(&mut self) -> anyhow::Result<()> {
+    async fn connect_with_retry(&mut self, events: &mut EventProducer) -> anyhow::Result<()> {
         const MAX_ATTEMPTS: u32 = 30;
         const RETRY_DELAY: Duration = Duration::from_secs(2);
 
@@ -42,7 +39,7 @@ impl IbGatewayClient {
             match Client::connect(&url, self.config.client_id).await {
                 Ok(client) => {
                     self.client = Some(client);
-                    let _ = self.publisher.publish(MarketEvent::Connection(
+                    let _ = events.try_publish(MarketEvent::Connection(
                         ConnectionEvent::Connected {
                             client_id: self.config.client_id,
                         },
@@ -66,8 +63,8 @@ impl IbGatewayClient {
 
 #[async_trait::async_trait]
 impl MarketDataSource for IbGatewayClient {
-    async fn connect(&mut self) -> anyhow::Result<()> {
-        self.connect_with_retry().await?;
+    async fn connect(&mut self, events: &mut EventProducer) -> anyhow::Result<()> {
+        self.connect_with_retry(events).await?;
 
         if let Some(client) = self.client.as_ref() {
             let accounts = client
@@ -75,24 +72,20 @@ impl MarketDataSource for IbGatewayClient {
                 .await
                 .context("managed accounts")?;
             info!(?accounts, "managed accounts");
-            let _ =
-                self.publisher
-                    .publish(MarketEvent::Control(crate::core::model::ControlEvent {
-                        ts_ns: now_ns(),
-                        message: format!("managed accounts: {accounts:?}"),
-                    }));
+            let _ = events.try_publish(MarketEvent::Control(crate::core::model::ControlEvent {
+                ts_ns: now_ns(),
+                message: format!("managed accounts: {accounts:?}"),
+            }));
         }
 
         Ok(())
     }
 
-    async fn disconnect(&mut self) -> anyhow::Result<()> {
+    async fn disconnect(&mut self, events: &mut EventProducer) -> anyhow::Result<()> {
         if self.client.take().is_some() {
-            let _ =
-                self.publisher
-                    .publish(MarketEvent::Connection(ConnectionEvent::Disconnected {
-                        reason: "client dropped".into(),
-                    }));
+            let _ = events.try_publish(MarketEvent::Connection(ConnectionEvent::Disconnected {
+                reason: "client dropped".into(),
+            }));
         }
         Ok(())
     }
@@ -134,15 +127,5 @@ impl SubscriptionControl for IbGatewayClient {
     async fn unsubscribe_depth(&self, id: SubscriptionId) -> anyhow::Result<()> {
         tracing::info!(req_id = id, "unsubscribe_depth queued");
         Ok(())
-    }
-}
-
-impl Clone for IbGatewayClient {
-    fn clone(&self) -> Self {
-        Self {
-            config: self.config.clone(),
-            publisher: Arc::clone(&self.publisher),
-            client: None,
-        }
     }
 }

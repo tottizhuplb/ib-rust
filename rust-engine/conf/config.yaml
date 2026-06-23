@@ -13,8 +13,6 @@ ib:
 
 storage:
   data_dir: ./data          # WAL 根目录；market 落盘于 ./data/market
-  segment_max_bytes: 268435456
-  wal_rotation: hourly      # hourly | size
 
 pipeline:
   event_channel_capacity: 50000

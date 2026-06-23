@@ -5,27 +5,14 @@ use std::path::Path;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use super::layout;
 use super::WalConfig;
 
-/// 按段读取 WAL，用于 recovery 与验证。
+/// 读取 WAL，用于 recovery 与验证。
 pub struct WalReader;
 
 impl WalReader {
-    pub fn read_segment_json(path: &Path) -> anyhow::Result<Vec<serde_json::Value>> {
-        let file = File::open(path)?;
-        let buf = BufReader::new(file);
-        let mut values = Vec::new();
-        for line in buf.lines() {
-            let line = line?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            values.push(serde_json::from_str(&line)?);
-        }
-        Ok(values)
-    }
-
-    pub fn read_segment<T: DeserializeOwned>(path: &Path) -> anyhow::Result<Vec<T>> {
+    pub fn read_file<T: DeserializeOwned>(path: &Path) -> anyhow::Result<Vec<T>> {
         let file = File::open(path)?;
         let buf = BufReader::new(file);
         let mut records = Vec::new();
@@ -40,22 +27,11 @@ impl WalReader {
     }
 
     pub fn read_all<T: DeserializeOwned + WalSeq>(config: &WalConfig) -> anyhow::Result<Vec<T>> {
-        let data_dir = config.data_dir();
-        let mut paths: Vec<_> = std::fs::read_dir(&data_dir)?
-            .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path())
-            .filter(|path| {
-                path.file_name()
-                    .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.starts_with("wal-") && name.ends_with(".jsonl"))
-            })
-            .collect();
-        paths.sort();
-
-        let mut records = Vec::new();
-        for path in paths {
-            records.extend(Self::read_segment(&path)?);
+        let path = layout::wal_path(&config.data_dir());
+        if !path.exists() {
+            return Ok(Vec::new());
         }
+        let mut records = Self::read_file(&path)?;
         records.sort_by_key(WalSeq::wal_seq);
         Ok(records)
     }
@@ -83,7 +59,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::wal::{WalRecordKind, WalRotation, WalWriter};
+    use crate::core::wal::{WalRecordKind, WalWriter};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -103,13 +79,11 @@ mod tests {
         WalConfig {
             root_dir: dir.to_path_buf(),
             domain: "test",
-            segment_max_bytes: 1024 * 1024,
-            rotation: WalRotation::Hourly,
         }
     }
 
     #[test]
-    fn read_segment_roundtrip() -> anyhow::Result<()> {
+    fn read_file_roundtrip() -> anyhow::Result<()> {
         let dir = tempfile::tempdir()?;
         let config = test_config(dir.path());
         let mut writer = WalWriter::new(config.clone())?;
@@ -123,17 +97,8 @@ mod tests {
         writer.append_line(1, &line, WalRecordKind::Event)?;
         writer.flush()?;
 
-        let data_dir = config.data_dir();
-        let segment = std::fs::read_dir(&data_dir)?
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .find(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("wal-") && n.ends_with(".jsonl"))
-            })
-            .expect("segment file");
-        let records: Vec<TestRecord> = WalReader::read_segment(&segment)?;
+        let path = config.wal_path();
+        let records: Vec<TestRecord> = WalReader::read_file(&path)?;
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].seq, 1);
         Ok(())

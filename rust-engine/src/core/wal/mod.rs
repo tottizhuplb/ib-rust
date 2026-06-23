@@ -7,25 +7,6 @@ pub struct WalConfig {
     pub root_dir: PathBuf,
     /// 域子目录名，如 `market` → `./data/market`。
     pub domain: &'static str,
-    pub segment_max_bytes: u64,
-    pub rotation: WalRotation,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum WalRotation {
-    #[default]
-    Hourly,
-    /// 仅按字节切分（不按小时）。
-    SizeOnly,
-}
-
-impl WalRotation {
-    pub fn parse(value: &str) -> Self {
-        match value.to_ascii_lowercase().as_str() {
-            "size" | "size_only" => Self::SizeOnly,
-            _ => Self::Hourly,
-        }
-    }
 }
 
 impl WalConfig {
@@ -42,16 +23,17 @@ impl WalConfig {
     pub fn checkpoint_path(&self) -> PathBuf {
         layout::checkpoint_path(&self.data_dir())
     }
+
+    pub fn wal_path(&self) -> PathBuf {
+        layout::wal_path(&self.data_dir())
+    }
 }
 
 pub mod checkpoint;
 pub mod layout;
-mod segment;
-mod time;
 pub mod reader;
 pub mod writer;
 
 pub use checkpoint::WalCheckpoint;
 pub use reader::{last_snapshot, WalReader, WalSeq, WalSnapshotRecord};
-pub use segment::SegmentIdentity;
 pub use writer::{WalRecordKind, WalWriter};

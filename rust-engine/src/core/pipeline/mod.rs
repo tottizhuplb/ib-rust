@@ -1,9 +1,8 @@
 pub mod backpressure;
 pub mod bus;
-pub mod dispatcher;
 
+pub use backpressure::{event_channel, EventConsumer, EventProducer};
 pub use bus::{
-    EventPublisher, EventRecorder, MarketDataSource, PublishError, SnapshotStore,
-    SubscriptionControl, SubscriptionId,
+    EventRecorder, MarketDataSource, PublishError, SnapshotStore, SubscriptionControl,
+    SubscriptionId,
 };
-pub use dispatcher::MpscPublisher;

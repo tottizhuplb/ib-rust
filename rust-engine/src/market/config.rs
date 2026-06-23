@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::core::wal::{WalConfig, WalRotation};
+use crate::core::wal::WalConfig;
 use crate::market::subscription::DesiredSubscription;
 
 /// Docker Compose 服务名，与 `docker-compose.yml` 中 ib-gateway 一致，不可配置。
@@ -27,8 +27,6 @@ pub struct IbConfig {
 pub struct StorageConfig {
     /// WAL 根目录，各域使用 `{root_dir}/{domain}` 子目录。
     pub root_dir: PathBuf,
-    pub segment_max_bytes: u64,
-    pub wal_rotation: WalRotation,
 }
 
 impl StorageConfig {
@@ -36,8 +34,6 @@ impl StorageConfig {
         WalConfig {
             root_dir: self.root_dir.clone(),
             domain: MARKET_WAL_DOMAIN,
-            segment_max_bytes: self.segment_max_bytes,
-            rotation: self.wal_rotation,
         }
     }
 

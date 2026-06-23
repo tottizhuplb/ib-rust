@@ -3,27 +3,24 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, watch, Mutex};
 use tracing::info;
 
-use crate::core::pipeline::EventPublisher;
+use crate::core::pipeline::backpressure::event_channel;
 use crate::core::task::TaskGroup;
 use crate::market::config::{MarketConfig, IB_GATEWAY_HOST};
 use crate::market::MarketPhase;
 use crate::market::{
     ConnectionManager, HealthService, IbGatewayClient, OrderBookStore, RecorderService,
-    SnapshotService, SubscriptionManager,
+    SubscriptionManager,
 };
-use crate::market::wal::MarketWalWriter;
 
 /// market 域 shutdown 句柄（worker 由顶层 [`TaskGroup`] 统一 join）。
 pub struct MarketHandles {
     phase_tx: watch::Sender<MarketPhase>,
-    event_tx: tokio::sync::mpsc::Sender<crate::core::model::MarketEvent>,
 }
 
 impl MarketHandles {
     pub fn begin_shutdown(self, shutdown_tx: &broadcast::Sender<()>) {
         let _ = self.phase_tx.send(MarketPhase::ShuttingDown);
         let _ = shutdown_tx.send(());
-        drop(self.event_tx);
     }
 }
 
@@ -42,49 +39,42 @@ pub fn register(
         "registering market domain"
     );
 
-    let (event_tx, event_rx) =
-        crate::core::pipeline::backpressure::event_channel(config.pipeline.event_channel_capacity);
+    let (mut event_producer, event_consumer) =
+        event_channel(config.pipeline.event_channel_capacity);
     let (phase_tx, _phase_rx) = watch::channel(MarketPhase::Starting);
 
-    let publisher: Arc<dyn EventPublisher> =
-        crate::core::pipeline::MpscPublisher::new(event_tx.clone());
-
-    let ib_client = Arc::new(Mutex::new(IbGatewayClient::new(
-        config.ib.clone(),
-        Arc::clone(&publisher),
-    )));
+    let ib_client = Arc::new(Mutex::new(IbGatewayClient::new(config.ib.clone())));
 
     let books = Arc::new(OrderBookStore::new());
-    let wal = Arc::new(Mutex::new(MarketWalWriter::new(config.storage.wal_config())?));
 
     tasks.spawn_named("market-recorder", {
-        let wal = Arc::clone(&wal);
         let books = Arc::clone(&books);
         let shutdown_rx = shutdown_tx.subscribe();
+        let wal_config = config.storage.wal_config();
         let flush_interval_ms = config.pipeline.flush_interval_ms;
+        let snapshot_interval_secs = config.pipeline.snapshot_interval_secs;
         async move {
-            RecorderService::run(event_rx, wal, books, shutdown_rx, flush_interval_ms).await
+            RecorderService::run(
+                event_consumer,
+                wal_config,
+                books,
+                shutdown_rx,
+                flush_interval_ms,
+                snapshot_interval_secs,
+            )
+            .await
         }
-    });
-
-    tasks.spawn_named("market-snapshot", {
-        let wal = Arc::clone(&wal);
-        let books = Arc::clone(&books);
-        let shutdown_rx = shutdown_tx.subscribe();
-        let interval_secs = config.pipeline.snapshot_interval_secs;
-        async move { SnapshotService::run(books, wal, shutdown_rx, interval_secs).await }
     });
 
     tasks.spawn_named("market-connection", {
         let client = Arc::clone(&ib_client);
-        let publisher = Arc::clone(&publisher);
         let shutdown_rx = shutdown_tx.subscribe();
         let phase_tx = phase_tx.clone();
         let initial_backoff = config.pipeline.reconnect_backoff_secs;
         async move {
             ConnectionManager::run_supervisor(
                 client,
-                publisher,
+                &mut event_producer,
                 shutdown_rx,
                 phase_tx,
                 initial_backoff,
@@ -111,5 +101,5 @@ pub fn register(
         async move { HealthService::run(shutdown_rx, phase_rx).await }
     });
 
-    Ok(MarketHandles { phase_tx, event_tx })
+    Ok(MarketHandles { phase_tx })
 }
