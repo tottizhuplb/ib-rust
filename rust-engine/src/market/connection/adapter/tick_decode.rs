@@ -1,9 +1,10 @@
 use ibapi::contracts::tick_types::TickType;
-use ibapi::market_data::realtime::{MarketDepth, MarketDepthL2, MarketDepths, TickTypes};
+use ibapi::market_data::realtime::{BidAsk, MarketDepth, MarketDepthL2, MarketDepths, MidPoint, TickTypes, Trade};
 use rust_decimal::Decimal;
 
 use crate::core::model::{
-    now_ns, BookSide, DepthEvent, DepthOperation, MarketEvent, TopOfBookEvent,
+    now_ns, BookSide, DepthEvent, DepthOperation, MarketEvent, TickByTickEvent, TickByTickType,
+    TopOfBookEvent,
 };
 use tokio::sync::mpsc;
 
@@ -146,6 +147,79 @@ pub fn publish_depth(
         }
     };
     try_publish(events, event)
+}
+
+pub fn publish_tick_by_tick_trade(
+    events: &mpsc::Sender<MarketEvent>,
+    req_id: i32,
+    symbol: &Symbol,
+    tick_type: TickByTickType,
+    trade: &Trade,
+) -> Result<(), PublishError> {
+    try_publish(
+        events,
+        MarketEvent::TickByTick(TickByTickEvent {
+            ts_recv_ns: now_ns(),
+            req_id,
+            symbol: symbol.clone(),
+            tick_type,
+            price: trade.price,
+            size: trade.size,
+            bid: None,
+            ask: None,
+            bid_size: None,
+            ask_size: None,
+            exchange: Some(trade.exchange.clone()),
+        }),
+    )
+}
+
+pub fn publish_tick_by_tick_bid_ask(
+    events: &mpsc::Sender<MarketEvent>,
+    req_id: i32,
+    symbol: &Symbol,
+    quote: &BidAsk,
+) -> Result<(), PublishError> {
+    try_publish(
+        events,
+        MarketEvent::TickByTick(TickByTickEvent {
+            ts_recv_ns: now_ns(),
+            req_id,
+            symbol: symbol.clone(),
+            tick_type: TickByTickType::BidAsk,
+            price: 0.0,
+            size: 0.0,
+            bid: Some(quote.bid_price),
+            ask: Some(quote.ask_price),
+            bid_size: Some(quote.bid_size),
+            ask_size: Some(quote.ask_size),
+            exchange: None,
+        }),
+    )
+}
+
+pub fn publish_tick_by_tick_midpoint(
+    events: &mpsc::Sender<MarketEvent>,
+    req_id: i32,
+    symbol: &Symbol,
+    midpoint: &MidPoint,
+) -> Result<(), PublishError> {
+    try_publish(
+        events,
+        MarketEvent::TickByTick(TickByTickEvent {
+            ts_recv_ns: now_ns(),
+            req_id,
+            symbol: symbol.clone(),
+            tick_type: TickByTickType::MidPoint,
+            price: midpoint.mid_point,
+            size: 0.0,
+            bid: None,
+            ask: None,
+            bid_size: None,
+            ask_size: None,
+            exchange: None,
+        }),
+    )
 }
 
 fn decimal_from_f64(value: f64) -> Decimal {

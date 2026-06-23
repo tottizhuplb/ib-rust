@@ -98,7 +98,12 @@ fn load_subscriptions(path: &Path) -> anyhow::Result<Vec<DesiredSubscription>> {
     let entries: Vec<SubscriptionEntry> =
         serde_yaml::from_str(&text).context("parse subscriptions yaml")?;
 
-    tracing::info!(path = %path.display(), count = entries.len(), "loaded subscriptions");
+    let mut subscriptions = Vec::new();
+    for entry in entries {
+        subscriptions.extend(entry.expand_desired()?);
+    }
 
-    Ok(entries.into_iter().map(DesiredSubscription::from).collect())
+    tracing::info!(path = %path.display(), count = subscriptions.len(), "loaded subscriptions");
+
+    Ok(subscriptions)
 }

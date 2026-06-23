@@ -1,14 +1,24 @@
 # market 域 — 订阅标的（session ready 后由 Subscription Manager reconcile）
+#
+# 必填: symbol, exchange, mode
+# 推断: currency（由 exchange）, sec_type=STK
+#
+# mode: 可用 | 组合，如 reqMktData|reqMktDepth
+# levels:    reqMktDepth 专用，省略默认 10
+# tick_type: reqTickByTickData 专用，省略默认 Last
+
+- symbol: AAPL
+  exchange: SMART
+  mode: reqMktData|reqTickByTickData
+
+- symbol: MSFT
+  exchange: SMART
+  mode: reqMktData|reqTickByTickData
 
 - symbol: "00700"
   exchange: SEHK
-  currency: HKD
-  sec_type: STK
-  mode: depth
-  levels: 10
+  mode: reqMktData
 
 - symbol: "09988"
   exchange: SEHK
-  currency: HKD
-  sec_type: STK
-  mode: top
+  mode: reqMktData

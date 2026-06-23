@@ -4,6 +4,7 @@ pub mod error;
 pub mod event;
 pub mod logging;
 pub mod symbol;
+pub mod tick_by_tick;
 pub mod top;
 
 pub use connection::{ConnectionEvent, ControlEvent};
@@ -12,4 +13,5 @@ pub use error::ApiErrorEvent;
 pub use event::{now_ns, MarketEvent};
 pub use logging::{LogRotation, LoggingConfig};
 pub use symbol::{SecType, Symbol};
+pub use tick_by_tick::{TickByTickEvent, TickByTickType};
 pub use top::TopOfBookEvent;

@@ -45,6 +45,7 @@ impl SubscriptionRegistry {
                 req_id: -1,
                 symbol: desired.symbol.clone(),
                 kind: desired.kind,
+                tick_type: desired.tick_type,
                 status: SubscriptionStatus::Pending,
             },
         );

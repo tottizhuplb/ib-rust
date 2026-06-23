@@ -44,7 +44,7 @@ impl SubscriptionManager {
         match phase {
             MarketPhase::Connected => self.reconcile().await?,
             MarketPhase::Connecting | MarketPhase::Recovering => {
-                info!("unsubscribing all top and depth for reconnect");
+                info!("unsubscribing all market data streams for reconnect");
                 self.client.lock().await.unsubscribe_all().await;
                 self.registry.clear_active();
             }
@@ -65,21 +65,29 @@ impl SubscriptionManager {
             info!(
                 symbol = %desired.symbol.code,
                 exchange = %desired.symbol.exchange,
-                ?desired.kind,
+                api = ?desired.kind,
                 levels = ?desired.levels,
+                tick_type = ?desired.tick_type,
                 "reconcile: subscribing"
             );
 
             let result = match desired.kind {
-                SubscriptionKind::Top => {
+                SubscriptionKind::ReqMktData => {
                     let client = self.client.lock().await;
-                    client.subscribe_market_data(desired.symbol.clone()).await
+                    client.subscribe_req_mkt_data(desired.symbol.clone()).await
                 }
-                SubscriptionKind::Depth => {
+                SubscriptionKind::ReqTickByTickData => {
+                    let tick_type = desired.tick_type.unwrap_or_default();
+                    let client = self.client.lock().await;
+                    client
+                        .subscribe_req_tick_by_tick(desired.symbol.clone(), tick_type)
+                        .await
+                }
+                SubscriptionKind::ReqMktDepth => {
                     let levels = desired.levels.unwrap_or(10);
                     let client = self.client.lock().await;
                     client
-                        .subscribe_market_depth(desired.symbol.clone(), levels)
+                        .subscribe_req_mkt_depth(desired.symbol.clone(), levels)
                         .await
                 }
             };

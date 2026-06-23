@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use crate::core::model::{now_ns, ConnectionEvent, ControlEvent, MarketEvent, Symbol};
+use crate::core::model::{now_ns, ConnectionEvent, ControlEvent, MarketEvent, Symbol, TickByTickType};
 use crate::market::config::IbConfig;
 
 use super::adapter::equity_contract;
@@ -76,7 +76,6 @@ impl IbGatewayClient {
         Ok(())
     }
 
-    /// 取消全部 top / depth；drop ibapi [`Subscription`] 时向 IB 发送 cancel。
     pub async fn unsubscribe_all(&self) {
         self.streams.clear().await;
     }
@@ -120,20 +119,75 @@ impl IbGatewayClient {
         unreachable!()
     }
 
-    pub async fn subscribe_market_data(&self, symbol: Symbol) -> anyhow::Result<i32> {
+    pub async fn subscribe_req_mkt_data(&self, symbol: Symbol) -> anyhow::Result<i32> {
         let client = self.client.as_ref().context("IB client not connected")?;
         let contract = equity_contract(&symbol);
         let subscription = client.market_data(&contract).subscribe().await?;
         let req_id = subscription
             .request_id()
-            .context("IB market data subscription missing request_id")?;
+            .context("reqMktData subscription missing request_id")?;
         self.streams
-            .insert_top(req_id, symbol, subscription)
+            .insert_mkt_data(req_id, symbol, subscription)
             .await;
         Ok(req_id)
     }
 
-    pub async fn subscribe_market_depth(&self, symbol: Symbol, levels: usize) -> anyhow::Result<i32> {
+    pub async fn subscribe_req_tick_by_tick(
+        &self,
+        symbol: Symbol,
+        tick_type: TickByTickType,
+    ) -> anyhow::Result<i32> {
+        let client = self.client.as_ref().context("IB client not connected")?;
+        let contract = equity_contract(&symbol);
+
+        match tick_type {
+            TickByTickType::Last => {
+                let subscription = client.tick_by_tick(&contract, 0).last().await?;
+                let req_id = subscription
+                    .request_id()
+                    .context("reqTickByTickData subscription missing request_id")?;
+                self.streams
+                    .insert_tick_by_tick_trade(req_id, symbol, tick_type, subscription)
+                    .await;
+                Ok(req_id)
+            }
+            TickByTickType::AllLast => {
+                let subscription = client.tick_by_tick(&contract, 0).all_last().await?;
+                let req_id = subscription
+                    .request_id()
+                    .context("reqTickByTickData subscription missing request_id")?;
+                self.streams
+                    .insert_tick_by_tick_trade(req_id, symbol, tick_type, subscription)
+                    .await;
+                Ok(req_id)
+            }
+            TickByTickType::BidAsk => {
+                let subscription = client
+                    .tick_by_tick(&contract, 0)
+                    .bid_ask(IgnoreSize::No)
+                    .await?;
+                let req_id = subscription
+                    .request_id()
+                    .context("reqTickByTickData subscription missing request_id")?;
+                self.streams
+                    .insert_tick_by_tick_bid_ask(req_id, symbol, subscription)
+                    .await;
+                Ok(req_id)
+            }
+            TickByTickType::MidPoint => {
+                let subscription = client.tick_by_tick(&contract, 0).mid_point().await?;
+                let req_id = subscription
+                    .request_id()
+                    .context("reqTickByTickData subscription missing request_id")?;
+                self.streams
+                    .insert_tick_by_tick_midpoint(req_id, symbol, subscription)
+                    .await;
+                Ok(req_id)
+            }
+        }
+    }
+
+    pub async fn subscribe_req_mkt_depth(&self, symbol: Symbol, levels: usize) -> anyhow::Result<i32> {
         let client = self.client.as_ref().context("IB client not connected")?;
         let contract = equity_contract(&symbol);
         let rows = i32::try_from(levels).unwrap_or(10).clamp(1, 50);
@@ -144,9 +198,9 @@ impl IbGatewayClient {
             .await?;
         let req_id = subscription
             .request_id()
-            .context("IB market depth subscription missing request_id")?;
+            .context("reqMktDepth subscription missing request_id")?;
         self.streams
-            .insert_depth(req_id, symbol, subscription)
+            .insert_mkt_depth(req_id, symbol, subscription)
             .await;
         Ok(req_id)
     }

@@ -4,6 +4,7 @@ use super::{
     connection::{ConnectionEvent, ControlEvent},
     depth::DepthEvent,
     error::ApiErrorEvent,
+    tick_by_tick::TickByTickEvent,
     top::TopOfBookEvent,
 };
 
@@ -11,6 +12,7 @@ use super::{
 pub enum MarketEvent {
     Connection(ConnectionEvent),
     TopOfBook(TopOfBookEvent),
+    TickByTick(TickByTickEvent),
     Depth(DepthEvent),
     Control(ControlEvent),
     ApiError(ApiErrorEvent),

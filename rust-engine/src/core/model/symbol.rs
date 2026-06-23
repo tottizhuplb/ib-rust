@@ -19,6 +19,15 @@ pub struct Symbol {
 }
 
 impl Symbol {
+    pub fn us_equity(code: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            exchange: "SMART".into(),
+            currency: "USD".into(),
+            sec_type: SecType::Stk,
+        }
+    }
+
     pub fn hk_equity(code: impl Into<String>) -> Self {
         Self {
             code: code.into(),

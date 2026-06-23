@@ -37,6 +37,37 @@ impl OrderBookStore {
                 let book = books.entry(top.symbol.clone()).or_default();
                 apply_top(book, top);
             }
+            MarketEvent::TickByTick(tick) => {
+                if tick.bid.is_some() || tick.ask.is_some() {
+                    let mut books = self.inner.write().await;
+                    let book = books.entry(tick.symbol.clone()).or_default();
+                    apply_top(
+                        book,
+                        &TopOfBookEvent {
+                            ts_recv_ns: tick.ts_recv_ns,
+                            req_id: tick.req_id,
+                            symbol: tick.symbol.clone(),
+                            bid: tick.bid,
+                            ask: tick.ask,
+                            last: None,
+                        },
+                    );
+                } else if tick.price > 0.0 {
+                    let mut books = self.inner.write().await;
+                    let book = books.entry(tick.symbol.clone()).or_default();
+                    apply_top(
+                        book,
+                        &TopOfBookEvent {
+                            ts_recv_ns: tick.ts_recv_ns,
+                            req_id: tick.req_id,
+                            symbol: tick.symbol.clone(),
+                            bid: None,
+                            ask: None,
+                            last: Some(tick.price),
+                        },
+                    );
+                }
+            }
             _ => {}
         }
     }
