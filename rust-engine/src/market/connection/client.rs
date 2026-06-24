@@ -40,7 +40,13 @@ impl IbGatewayClient {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.client.is_some()
+        self.client
+            .as_ref()
+            .is_some_and(|client| client.is_connected())
+    }
+
+    pub async fn active_stream_count(&self) -> usize {
+        self.streams.active_stream_count().await
     }
 
     pub async fn connect(&mut self, events: &mpsc::Sender<MarketEvent>) -> anyhow::Result<()> {
@@ -79,6 +85,17 @@ impl IbGatewayClient {
 
     pub async fn unsubscribe_all(&self) {
         self.streams.clear().await;
+    }
+
+    /// 无实时 API 行情权限时，IB 会发 10089 提示延迟数据可用，但需显式切换模式后才会推 tick。
+    pub async fn switch_market_data_type_delayed(&self) -> anyhow::Result<()> {
+        let client = self.client.as_ref().context("IB client not connected")?;
+        client
+            .switch_market_data_type(MarketDataType::Delayed)
+            .await
+            .context("switch_market_data_type(Delayed)")?;
+        info!("IB market data type set to Delayed");
+        Ok(())
     }
 
     pub async fn poll_market_data(

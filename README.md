@@ -5,6 +5,8 @@ Interactive Brokers Gateway + Rust 交易引擎。首次使用：`cp .env.exampl
 Rust 引擎架构与模块说明见 [rust-engine/README.md](rust-engine/README.md)。
 
 ```bash
+# Gateway 与 engine 独立启动，顺序任意；engine 连不上 Gateway 时会自动重连。
+
 # 1. Gateway
 docker compose up ib-gateway -d
 

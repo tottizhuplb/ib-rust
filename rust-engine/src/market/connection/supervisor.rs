@@ -33,12 +33,13 @@ impl ConnectionManager {
 
             match IbSession::connect_shared(Arc::clone(&client), events).await {
                 Ok(session) => {
-                    let _ = phase_tx.send(MarketPhase::Connected);
                     backoff_secs = initial_backoff_secs.max(1);
 
                     if !session.wait_until_ready(events).await? {
                         anyhow::bail!("session failed to reach ready state");
                     }
+
+                    let _ = phase_tx.send(MarketPhase::Connected);
 
                     tokio::select! {
                         res = IbSession::run_reader_loop(Arc::clone(&client), events) => {
@@ -50,6 +51,9 @@ impl ConnectionManager {
                                     }),
                                 );
                                 warn!(error = %error, "reader loop ended");
+                            }
+                            if let Err(error) = session.shutdown(events).await {
+                                warn!(error = %error, "session shutdown after reader loop ended");
                             }
                         }
                         _ = shutdown_rx.recv() => {
@@ -110,8 +114,15 @@ fn spawn_status_logger(
                 tokio::select! {
                     _ = ticker.tick() => {
                         let phase = phase_rx.borrow().clone();
-                        let ib_connected = client.lock().await.is_connected();
-                        info!(phase = ?phase, ib_connected, "connection status");
+                        let guard = client.lock().await;
+                        let socket_connected = guard.is_connected();
+                        let active_streams = guard.active_stream_count().await;
+                        info!(
+                            phase = ?phase,
+                            socket_connected,
+                            active_streams,
+                            "connection status"
+                        );
                     }
                     _ = shutdown_rx.recv() => break,
                 }

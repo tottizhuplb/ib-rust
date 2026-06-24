@@ -1,7 +1,7 @@
 ---
 description: Tokio 任务与 blocking 线程必须具名，便于日志 thread name 定位
 globs: **/*.rs
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Tokio 任务 / 线程命名

@@ -7,16 +7,13 @@
 #                 docker exec -it rust-engine-dev bash
 #   生产模式：    docker compose --profile prod up -d --build rust-engine
 #
-# 说明：不带 profile 的 `docker compose up` 只会启动 ib-gateway，
+# 说明：Gateway 与 engine 独立启动，无 depends_on；engine 连不上时会自行重连。
+#       不带 profile 的 `docker compose up` 只会启动 ib-gateway，
 #       engine 需通过 dev / prod profile 显式选择。
 # =============================================================================
 
 # rust-engine 公共配置（prod / dev 共用，通过 YAML anchor 继承）
-# 配置与 ib-gateway 共用 .env（见 .env.example）
 x-rust-engine-base: &rust-engine-base
-  depends_on:
-    ib-gateway:
-      condition: service_healthy # 等 Gateway API 端口就绪后再启动 engine
   env_file:
     - .env
   working_dir: /app
@@ -47,11 +44,11 @@ services:
       - "127.0.0.1:4002:4004"  # 模拟盘 API（socat → 容器 4004）
       - "127.0.0.1:5900:5900"  # VNC（需在 .env 配置 VNC_SERVER_PASSWORD）
     healthcheck:
-      # gnzsnz 通过 socat 暴露 API；paper 检查 4004，live 检查 4003
+      # 检查 socat 是否在 LISTEN，勿用 </dev/tcp> 连 API 端口（会触发 Gateway「disconnected before version was sent」）
       test:
         [
           "CMD-SHELL",
-          "if [ \"$$TRADING_MODE\" = live ]; then port=4003; else port=4004; fi; bash -c \"</dev/tcp/127.0.0.1/$$port\" || exit 1",
+          "if [ \"$$TRADING_MODE\" = live ]; then port=4003; else port=4004; fi; pgrep -f \"TCP-LISTEN:$$port,\" >/dev/null",
         ]
       interval: 30s
       timeout: 5s
@@ -98,7 +95,7 @@ services:
       - rust-engine-cargo-git:/usr/local/cargo/git
       - rust-engine-target:/app/target
 
-# 容器间通信网络（ib-gateway ↔ rust-engine）
+# 容器间通信网络（gateway、engine 等同网段；engine 通过配置连接 gateway）
 networks:
   ib-net:
     driver: bridge

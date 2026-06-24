@@ -58,6 +58,10 @@ impl SubscriptionManager {
         self.client.lock().await.unsubscribe_all().await;
         self.registry.clear_active();
 
+        if let Err(error) = self.client.lock().await.switch_market_data_type_delayed().await {
+            warn!(error = %error, "failed to switch to delayed market data; continuing with default type");
+        }
+
         let to_subscribe = self.registry.desired_cloned();
 
         for desired in to_subscribe {

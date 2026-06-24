@@ -7,18 +7,18 @@
 # levels:    reqMktDepth 专用，省略默认 10
 # tick_type: reqTickByTickData 专用，省略默认 Last
 
-- symbol: AAPL
-  exchange: SMART
-  mode: reqMktData|reqTickByTickData
+# - symbol: AAPL
+#   exchange: SMART
+#   mode: reqMktData|reqTickByTickData
 
-- symbol: MSFT
-  exchange: SMART
-  mode: reqMktData|reqTickByTickData
+# - symbol: MSFT
+#   exchange: SMART
+#   mode: reqMktData|reqTickByTickData
 
-- symbol: "00700"
+- symbol: "700"
   exchange: SEHK
   mode: reqMktData
 
-- symbol: "09988"
+- symbol: "9988"
   exchange: SEHK
   mode: reqMktData

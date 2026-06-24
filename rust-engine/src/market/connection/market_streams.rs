@@ -131,6 +131,13 @@ impl MarketDataStreams {
         self.tick_by_tick.lock().await.clear();
     }
 
+    pub async fn active_stream_count(&self) -> usize {
+        let mkt_data = self.mkt_data.lock().await.len();
+        let mkt_depth = self.mkt_depth.lock().await.len();
+        let tick_by_tick = self.tick_by_tick.lock().await.len();
+        mkt_data + mkt_depth + tick_by_tick
+    }
+
     pub async fn poll(&self, events: &mpsc::Sender<MarketEvent>) -> anyhow::Result<bool> {
         let mut any = false;
         any |= self.poll_mkt_data(events).await?;
